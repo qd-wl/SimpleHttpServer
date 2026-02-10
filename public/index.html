@@ -1,0 +1,1672 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>简单文件服务器</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            padding: 0;
+            margin: 0;
+            height: 100vh;
+            overflow: hidden;
+        }
+        
+        .container {
+            display: flex;
+            height: 100vh;
+            background: white;
+        }
+        
+        .sidebar {
+            min-width: 200px;
+            width: 280px;
+            max-width: 600px;
+            border-right: 1px solid #e0e0e0;
+            display: flex;
+            flex-direction: column;
+            background: #fafafa;
+            position: relative;
+        }
+        
+        .sidebar-header {
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        
+        .tree-container {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .tree-item {
+            display: flex;
+            align-items: center;
+            padding: 6px 8px;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 14px;
+            user-select: none;
+            margin: 2px 0;
+            min-height: 32px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        .tree-item:hover {
+            background: #e8f5e9;
+        }
+        
+        .tree-item.active {
+            background: #607D8B !important;
+            color: white;
+            font-weight: 600;
+        }
+        
+        .tree-item.active .tree-item-icon {
+            filter: brightness(1.8);
+        }
+        
+        .tree-item.active .tree-item-icon.has-content {
+            filter: sepia(100%) saturate(500%) hue-rotate(190deg) brightness(1.4);
+        }
+        
+        .tree-item-icon {
+            margin-right: 6px;
+            font-size: 16px;
+        }
+        
+        .tree-item-icon.has-content {
+            filter: sepia(100%) saturate(500%) hue-rotate(190deg) brightness(0.9);
+        }
+        
+        .root-item {
+            padding: 10px;
+            border-bottom: 1px solid #e0e0e0;
+            background: #fafafa;
+        }
+        
+        .tree-children {
+            margin-left: 16px;
+        }
+        
+        .tree-toggle {
+            width: 16px;
+            height: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 4px;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .tree-toggle:hover {
+            color: #333;
+        }
+        
+        .main-content {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        h1 {
+            font-size: 20px;
+        }
+        
+        .log-btn {
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.2s;
+        }
+        
+        .log-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        
+        .breadcrumb {
+            padding: 15px 20px;
+            background: #f9f9f9;
+            font-size: 14px;
+            border: none;
+            border-bottom: none !important;
+        }
+        
+        .breadcrumb span {
+            cursor: pointer;
+            color: #4CAF50;
+            padding: 2px 4px;
+            transition: all 0.2s;
+            display: inline-block;
+        }
+        
+        .breadcrumb span:hover {
+            color: #45a049;
+        }
+        
+        .toolbar {
+            padding: 15px 20px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+        
+        button {
+            padding: 8px 16px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        button:hover {
+            background: #45a049;
+        }
+        
+        button.secondary {
+            background: #2196F3;
+        }
+        
+        button.secondary:hover {
+            background: #0b7dda;
+        }
+        
+        .content-area {
+            flex: 1;
+            overflow-y: auto;
+        }
+        
+        .file-list {
+            padding: 20px;
+        }
+        
+        .item {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+            transition: background 0.2s;
+        }
+        
+        .item:hover {
+            background: #f9f9f9;
+        }
+        
+        .item-icon {
+            width: 40px;
+            height: 40px;
+            margin-right: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+        
+        .item-icon.has-content {
+            filter: sepia(100%) saturate(500%) hue-rotate(190deg) brightness(0.9);
+        }
+        
+        .item-info {
+            flex: 1;
+        }
+        
+        .item-name {
+            font-weight: 500;
+            cursor: pointer;
+            color: #333;
+        }
+        
+        .item-name:hover {
+            text-decoration: underline;
+        }
+        
+        .item-meta {
+            font-size: 12px;
+            color: #999;
+            margin-top: 4px;
+        }
+        
+        .item-actions {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .item-actions button {
+            padding: 6px 12px;
+            font-size: 12px;
+        }
+        
+        .delete-btn {
+            background: #f44336;
+        }
+        
+        .delete-btn:hover {
+            background: #da190b;
+        }
+        
+        .empty {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+        
+        .modal.active {
+            display: flex;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 24px;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 90%;
+        }
+        
+        .modal-content h2 {
+            margin-bottom: 12px;
+            font-size: 20px;
+        }
+        
+        .modal-path {
+            padding: 10px 12px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #2196F3;
+            font-weight: 500;
+            margin-bottom: 16px;
+            word-break: break-all;
+            overflow-wrap: break-word;
+            white-space: normal;
+            line-height: 1.6;
+            display: block;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        
+        .modal-content input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            margin-bottom: 16px;
+        }
+        
+        .modal-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+        }
+        
+        .confirm-dialog {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        
+        .confirm-dialog.active {
+            display: flex;
+        }
+        
+        .confirm-content {
+            background: white;
+            padding: 24px;
+            border-radius: 8px;
+            max-width: 450px;
+            width: 90%;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+        }
+        
+        .confirm-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #333;
+        }
+        
+        .confirm-item {
+            margin-bottom: 12px;
+            display: flex;
+            align-items: baseline;
+        }
+        
+        .confirm-label {
+            color: #666;
+            font-size: 14px;
+            min-width: 80px;
+        }
+        
+        .confirm-value {
+            color: #4CAF50;
+            font-weight: 600;
+            font-size: 15px;
+            word-break: break-all;
+        }
+        
+        .confirm-path {
+            color: #2196F3;
+            font-size: 13px;
+            font-weight: 500;
+            word-break: break-all;
+            overflow-wrap: break-word;
+            white-space: normal;
+            line-height: 1.6;
+            display: block;
+            max-width: 100%;
+        }
+        
+        .confirm-warning {
+            margin-top: 16px;
+            padding: 12px;
+            background: #fff3e0;
+            border-left: 3px solid #ff9800;
+            border-radius: 4px;
+            display: flex;
+            gap: 8px;
+            align-items: flex-start;
+        }
+        
+        .confirm-warning-icon {
+            color: #ff9800;
+            font-size: 18px;
+            line-height: 1;
+        }
+        
+        .confirm-warning-text {
+            color: #e65100;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+        
+        .confirm-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+        
+        .log-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 2000;
+        }
+        
+        .log-modal.active {
+            display: flex;
+        }
+        
+        .log-content {
+            background: white;
+            border-radius: 8px;
+            max-width: 900px;
+            width: 90%;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .log-header {
+            padding: 20px;
+            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .log-header h2 {
+            font-size: 20px;
+            margin: 0;
+        }
+        
+        .log-close {
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: #999;
+            padding: 0;
+            width: 32px;
+            height: 32px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .log-close:hover {
+            color: #333;
+        }
+        
+        .log-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .log-item {
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 13px;
+        }
+        
+        .log-item:hover {
+            background: #f9f9f9;
+        }
+        
+        .log-row {
+            display: flex;
+            gap: 12px;
+            align-items: baseline;
+            margin-bottom: 6px;
+        }
+        
+        .log-row:last-child {
+            margin-bottom: 0;
+        }
+        
+        .log-time {
+            color: #666;
+            min-width: 160px;
+        }
+        
+        .log-ip {
+            color: #2196F3;
+            min-width: 140px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        .log-hostname {
+            color: #9C27B0;
+            font-size: 12px;
+        }
+        
+        .log-action {
+            font-weight: 600;
+            min-width: 80px;
+            padding: 2px 8px;
+            border-radius: 3px;
+            display: inline-block;
+        }
+        
+        .log-action.download {
+            color: #2196F3;
+            background: rgba(33, 150, 243, 0.1);
+        }
+        
+        .log-action.upload {
+            color: #4CAF50;
+            background: rgba(76, 175, 80, 0.1);
+        }
+        
+        .log-action.delete-file {
+            color: #FF5722;
+            background: rgba(255, 87, 34, 0.1);
+        }
+        
+        .log-action.delete-folder {
+            color: #F44336;
+            background: rgba(244, 67, 54, 0.1);
+        }
+        
+        .log-action.create {
+            color: #9C27B0;
+            background: rgba(156, 39, 176, 0.1);
+        }
+        
+        .log-details {
+            color: #2196F3;
+            font-weight: 500;
+            flex: 1;
+            word-break: break-all;
+        }
+        
+        .log-empty {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        
+        .cancel-btn {
+            background: #999;
+        }
+        
+        .cancel-btn:hover {
+            background: #777;
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #999;
+        }
+        
+        .context-menu {
+            display: none;
+            position: fixed;
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+            z-index: 2000;
+            min-width: 160px;
+            padding: 4px 0;
+        }
+        
+        .context-menu.active {
+            display: block;
+        }
+        
+        .context-menu-item {
+            padding: 8px 16px;
+            cursor: pointer;
+            font-size: 14px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .context-menu-item:hover {
+            background: #f5f5f5;
+        }
+        
+        .tree-item-actions {
+            margin-left: auto;
+            display: none;
+            gap: 4px;
+        }
+        
+        .tree-item:hover .tree-item-actions {
+            display: flex;
+        }
+        
+        .tree-action-btn {
+            width: 20px;
+            height: 20px;
+            padding: 0;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255,255,255,0.8);
+            border: none;
+            border-radius: 3px;
+            cursor: pointer;
+            color: #666;
+        }
+        
+        .tree-action-btn:hover {
+            background: white;
+            color: #4CAF50;
+        }
+        
+        .tree-action-btn.delete {
+            color: #f44336;
+        }
+        
+        .tree-action-btn.delete:hover {
+            background: white;
+            color: #da190b;
+        }
+        
+        .resizer {
+            position: absolute;
+            right: 0;
+            top: 0;
+            bottom: 0;
+            width: 5px;
+            cursor: col-resize;
+            background: transparent;
+            z-index: 100;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- 左侧目录树 -->
+        <div class="sidebar" id="sidebar">
+            <div class="sidebar-header">📁 目录结构</div>
+            <div class="root-item">
+                <div class="tree-item" id="rootTreeItem" onclick="navigateTo('')" oncontextmenu="showContextMenu(event, '', '根目录')">
+                    <span class="tree-toggle"></span>
+                    <span class="tree-item-icon">🏠</span>
+                    <span>根目录</span>
+                    <div class="tree-item-actions">
+                        <button class="tree-action-btn" onclick="event.stopPropagation(); toggleExpandAllRoot()" title="展开/折叠所有" id="rootExpandBtn">⊞</button>
+                        <button class="tree-action-btn" onclick="event.stopPropagation(); createSubfolder('')" title="创建子文件夹">+</button>
+                    </div>
+                </div>
+            </div>
+            <div class="tree-container" id="treeContainer">
+                <div class="tree-children" id="treeRoot"></div>
+            </div>
+            <div class="resizer" id="resizer"></div>
+        </div>
+        
+        <!-- 右侧内容区 -->
+        <div class="main-content">
+            <div class="header">
+                <h1>📁 简单文件服务器</h1>
+                <div style="display: flex; gap: 10px;">
+                    <button class="log-btn" onclick="showHelp()" title="查看使用帮助">ℹ️ 帮助</button>
+                    <button class="log-btn" onclick="showLogs()" title="查看操作日志">📋 日志</button>
+                </div>
+            </div>
+            
+            <div class="breadcrumb">
+                <span id="breadcrumb">根目录</span>
+            </div>
+            
+            <div class="toolbar">
+                <button onclick="triggerFileUpload()">📤 上传文件</button>
+                <button class="secondary" onclick="showCreateFolder()">📁 新建文件夹</button>
+                <button class="secondary" onclick="goBack()" id="backBtn" style="display: none;">⬅️ 返回上级</button>
+                <button class="secondary" onclick="refreshAll()">🔄 刷新</button>
+            </div>
+            
+            <div class="content-area">
+                <div class="file-list" id="fileList">
+                    <div class="loading">加载中...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 上传文件输入 -->
+    <input type="file" id="fileInput" onchange="uploadFile()" multiple>
+    
+    <!-- 日志查看模态框 -->
+    <div class="log-modal" id="logModal">
+        <div class="log-content">
+            <div class="log-header">
+                <h2>📋 操作日志</h2>
+                <button class="log-close" onclick="closeLogs()">×</button>
+            </div>
+            <div class="log-body" id="logBody">
+                <div class="log-empty">加载中...</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 帮助模态框 -->
+    <div class="log-modal" id="helpModal">
+        <div class="log-content">
+            <div class="log-header">
+                <h2>❓ 使用帮助</h2>
+                <button class="log-close" onclick="closeHelp()">×</button>
+            </div>
+            <div class="log-body" style="line-height: 1.8;">
+                <div style="padding: 10px;">
+                    <h3 style="color: #4CAF50; margin-bottom: 15px; font-size: 18px;">📁 简单文件服务器</h3>
+                    <p style="color: #666; margin-bottom: 20px;">一个简单易用的网页文件管理工具，支持文件上传、下载、文件夹管理等功能。</p>
+                    
+                    <h4 style="color: #333; margin: 20px 0 10px 0; font-size: 16px;">🎯 主要功能</h4>
+                    <ul style="color: #555; padding-left: 25px;">
+                        <li style="margin-bottom: 8px;"><strong>文件上传：</strong>点击"上传文件"按钮，可选择单个或多个文件上传到当前文件夹</li>
+                        <li style="margin-bottom: 8px;"><strong>文件下载：</strong>点击文件旁的"下载"按钮即可下载文件</li>
+                        <li style="margin-bottom: 8px;"><strong>创建文件夹：</strong>点击"新建文件夹"按钮，在弹出的对话框中输入文件夹名称</li>
+                        <li style="margin-bottom: 8px;"><strong>删除文件/文件夹：</strong>点击"删除"按钮，确认后即可删除（文件夹会删除所有内容）</li>
+                        <li style="margin-bottom: 8px;"><strong>操作日志：</strong>点击右上角"日志"按钮，查看所有操作记录</li>
+                    </ul>
+                    
+                    <h4 style="color: #333; margin: 20px 0 10px 0; font-size: 16px;">🌲 目录树功能</h4>
+                    <ul style="color: #555; padding-left: 25px;">
+                        <li style="margin-bottom: 8px;"><strong>点击文件夹：</strong>左键点击文件夹可进入该文件夹，查看其中的文件和子文件夹</li>
+                        <li style="margin-bottom: 8px;"><strong>展开/折叠：</strong>点击文件夹前的箭头符号可展开或折叠子文件夹</li>
+                        <li style="margin-bottom: 8px;"><strong>快捷操作：</strong>鼠标悬停在文件夹上时，右侧会显示操作按钮
+                            <ul style="padding-left: 20px; margin-top: 5px;">
+                                <li>⊞/⊟ 展开/折叠所有子文件夹</li>
+                                <li>+ 创建子文件夹</li>
+                                <li>× 删除文件夹</li>
+                            </ul>
+                        </li>
+                        <li style="margin-bottom: 8px;"><strong>右键菜单：</strong>在文件夹上点击鼠标右键，可快速访问更多操作</li>
+                    </ul>
+                    
+                    <h4 style="color: #333; margin: 20px 0 10px 0; font-size: 16px;">💡 使用技巧</h4>
+                    <ul style="color: #555; padding-left: 25px;">
+                        <li style="margin-bottom: 8px;">面包屑导航可快速跳转到上级目录</li>
+                        <li style="margin-bottom: 8px;">支持拖拽多个文件同时上传</li>
+                        <li style="margin-bottom: 8px;">删除操作不可恢复，请谨慎操作</li>
+                    </ul>
+                    
+                    <div style="margin-top: 30px; padding: 15px; background: #f0f7ff; border-left: 4px solid #2196F3; border-radius: 4px;">
+                        <p style="margin: 0; color: #1976D2; font-size: 14px;">💡 <strong>提示：</strong>所有文件和文件夹都存储在服务器的 uploads 目录下，操作日志保存在 logs 目录中。</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 自定义确认对话框 -->
+    <div class="confirm-dialog" id="confirmDialog">
+        <div class="confirm-content">
+            <div class="confirm-title" id="confirmTitle">确认删除</div>
+            <div id="confirmBody"></div>
+            <div class="confirm-buttons">
+                <button class="cancel-btn" onclick="closeConfirmDialog()">取消</button>
+                <button class="delete-btn" onclick="confirmDelete()">确定</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 创建文件夹模态框 -->
+    <div class="modal" id="createFolderModal">
+        <div class="modal-content">
+            <h2>新建文件夹</h2>
+            <div class="confirm-item" style="margin-bottom: 16px;">
+                <span class="confirm-label">位置：</span>
+                <span class="confirm-path" id="modalPath">根目录</span>
+            </div>
+            <input type="text" id="folderNameInput" placeholder="输入文件夹名称">
+            <div class="modal-buttons">
+                <button class="cancel-btn" onclick="closeModal()">取消</button>
+                <button onclick="createFolder()">创建</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 右键菜单 -->
+    <div class="context-menu" id="contextMenu">
+        <div class="context-menu-item" onclick="contextCreateFolder()">
+            <span>📁</span>
+            <span>创建子文件夹</span>
+        </div>
+        <div class="context-menu-item" onclick="contextUploadFile()">
+            <span>📤</span>
+            <span>上传文件到此处</span>
+        </div>
+        <div class="context-menu-item" id="contextExpandAll" onclick="contextExpandAll()">
+            <span>⊞</span>
+            <span>展开所有子文件夹</span>
+        </div>
+        <div class="context-menu-item" id="contextCollapseAll" onclick="contextCollapseAll()">
+            <span>⊟</span>
+            <span>折叠所有子文件夹</span>
+        </div>
+        <div class="context-menu-item" onclick="contextDeleteFolder()" id="contextDeleteItem">
+            <span>🗑️</span>
+            <span>删除文件夹</span>
+        </div>
+    </div>
+    
+    <script>
+        let currentPath = '';
+        let treeData = [];
+        let expandedFolders = new Set(['']); // 默认展开根目录
+        let contextMenuPath = ''; // 右键菜单选中的路径
+        let contextMenuName = ''; // 右键菜单选中的名称
+        let createFolderTargetPath = null; // 创建文件夹的目标路径，null表示未设置
+        let pendingDeleteAction = null; // 待执行的删除操作
+        
+        // 显示确认对话框
+        function showConfirmDialog(title, itemName, itemType, path, onConfirm) {
+            const dialog = document.getElementById('confirmDialog');
+            const titleEl = document.getElementById('confirmTitle');
+            const bodyEl = document.getElementById('confirmBody');
+            
+            titleEl.textContent = title;
+            
+            const pathDisplay = path === '' ? '根目录' : `根目录 / ${path}`;
+            const isFolder = itemType === '文件夹';
+            
+            let html = `
+                <div class="confirm-item">
+                    <span class="confirm-label">${itemType}名：</span>
+                    <span class="confirm-value">${itemName}</span>
+                </div>
+                <div class="confirm-item">
+                    <span class="confirm-label">位置：</span>
+                    <span class="confirm-path">${pathDisplay}</span>
+                </div>
+            `;
+            
+            if (isFolder) {
+                html += `
+                    <div class="confirm-warning">
+                        <span class="confirm-warning-icon">⚠️</span>
+                        <span class="confirm-warning-text">此操作将删除该文件夹及其所有内容，且无法恢复！</span>
+                    </div>
+                `;
+            }
+            
+            bodyEl.innerHTML = html;
+            pendingDeleteAction = onConfirm;
+            dialog.classList.add('active');
+        }
+        
+        // 关闭确认对话框
+        function closeConfirmDialog() {
+            document.getElementById('confirmDialog').classList.remove('active');
+            pendingDeleteAction = null;
+        }
+        
+        // 确认删除
+        function confirmDelete() {
+            if (pendingDeleteAction) {
+                pendingDeleteAction();
+            }
+            closeConfirmDialog();
+        }
+        
+        // 显示日志
+        async function showLogs() {
+            const modal = document.getElementById('logModal');
+            const body = document.getElementById('logBody');
+            
+            modal.classList.add('active');
+            body.innerHTML = '<div class="log-empty">加载中...</div>';
+            
+            try {
+                const response = await fetch('/api/logs');
+                const logs = await response.json();
+                
+                if (logs.length === 0) {
+                    body.innerHTML = '<div class="log-empty">暂无操作日志</div>';
+                    return;
+                }
+                
+                let html = '';
+                logs.forEach(log => {
+                    const date = new Date(log.timestamp);
+                    const timeStr = date.toLocaleString('zh-CN', {
+                        year: 'numeric',
+                        month: '2-digit',
+                        day: '2-digit',
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                    });
+                    
+                    // 根据操作类型设置不同的颜色类
+                    let actionClass = '';
+                    if (log.action === '下载文件') {
+                        actionClass = 'download';
+                    } else if (log.action === '上传文件') {
+                        actionClass = 'upload';
+                    } else if (log.action === '删除文件') {
+                        actionClass = 'delete-file';
+                    } else if (log.action === '删除文件夹') {
+                        actionClass = 'delete-folder';
+                    } else if (log.action === '创建文件夹') {
+                        actionClass = 'create';
+                    }
+                    
+                    html += `
+                        <div class="log-item">
+                            <div class="log-row">
+                                <div class="log-time">${timeStr}</div>
+                                <div class="log-ip">${log.ip}</div>
+                                <div class="log-action ${actionClass}">${log.action}</div>
+                            </div>
+                            <div class="log-row">
+                                <div class="log-details" style="margin-left: 172px;">${log.details || '-'}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                body.innerHTML = html;
+            } catch (error) {
+                console.error('加载日志失败:', error);
+                body.innerHTML = '<div class="log-empty">加载日志失败</div>';
+            }
+        }
+        
+        // 关闭日志
+        function closeLogs() {
+            document.getElementById('logModal').classList.remove('active');
+        }
+        
+        // 显示帮助
+        function showHelp() {
+            document.getElementById('helpModal').classList.add('active');
+        }
+        
+        // 关闭帮助
+        function closeHelp() {
+            document.getElementById('helpModal').classList.remove('active');
+        }
+        
+        // 页面加载时获取文件列表和目录树
+        window.addEventListener('DOMContentLoaded', () => {
+            loadTree();
+            loadFiles();
+        });
+        
+        // 加载目录树
+        async function loadTree() {
+            try {
+                const response = await fetch('/api/tree');
+                treeData = await response.json();
+                renderTree();
+            } catch (error) {
+                console.error('加载目录树失败:', error);
+            }
+        }
+        
+        // 渲染目录树
+        function renderTree() {
+            const treeRoot = document.getElementById('treeRoot');
+            treeRoot.innerHTML = renderTreeItems(treeData);
+            
+            // 更新根目录的高亮状态
+            const rootItem = document.getElementById('rootTreeItem');
+            if (currentPath === '') {
+                rootItem.classList.add('active');
+            } else {
+                rootItem.classList.remove('active');
+            }
+            
+            // 更新根目录按钮状态
+            const rootExpandBtn = document.getElementById('rootExpandBtn');
+            if (rootExpandBtn && treeData.length > 0) {
+                const allExpanded = isAllExpanded(treeData);
+                rootExpandBtn.textContent = allExpanded ? '⊟' : '⊞';
+                rootExpandBtn.title = allExpanded ? '折叠所有' : '展开所有';
+            }
+        }
+        
+        // 递归渲染树项
+        function renderTreeItems(items, level = 0) {
+            let html = '';
+            
+            items.forEach(item => {
+                const hasChildren = item.children && item.children.length > 0;
+                const isExpanded = expandedFolders.has(item.path);
+                const isActive = item.path === currentPath;
+                const toggleIcon = hasChildren ? (isExpanded ? '▼' : '▶') : '';
+                // 根据是否为空显示不同图标和颜色
+                const folderIcon = item.isEmpty ? '📂' : '📁';
+                const iconClass = item.isEmpty ? '' : 'has-content';
+                // 展开/收拢图标
+                const expandIcon = isExpanded ? '⊟' : '⊞';
+                
+                html += `
+                    <div>
+                        <div class="tree-item ${isActive ? 'active' : ''}" 
+                             onclick="navigateTo('${item.path}')" 
+                             oncontextmenu="showContextMenu(event, '${item.path}', '${item.name}')"
+                             style="padding-left: ${level * 8}px">
+                            ${hasChildren ? `<span class="tree-toggle" onclick="event.stopPropagation(); toggleFolder('${item.path}')">${toggleIcon}</span>` : '<span class="tree-toggle"></span>'}
+                            <span class="tree-item-icon ${iconClass}">${folderIcon}</span>
+                            <span>${item.name}</span>
+                            <div class="tree-item-actions">
+                                ${hasChildren ? `<button class="tree-action-btn" onclick="event.stopPropagation(); toggleExpandAll('${item.path}', ${!isExpanded})" title="${isExpanded ? '折叠所有' : '展开所有'}">${expandIcon}</button>` : ''}
+                                <button class="tree-action-btn" onclick="event.stopPropagation(); createSubfolder('${item.path}')" title="创建子文件夹">+</button>
+                                <button class="tree-action-btn delete" onclick="event.stopPropagation(); deleteFolder('${item.path}', '${item.name}')" title="删除文件夹">×</button>
+                            </div>
+                        </div>
+                        ${hasChildren && isExpanded ? `<div class="tree-children">${renderTreeItems(item.children, level + 1)}</div>` : ''}
+                    </div>
+                `;
+            });
+            
+            return html;
+        }
+        
+        // 切换文件夹展开/折叠
+        function toggleFolder(folderPath) {
+            if (expandedFolders.has(folderPath)) {
+                expandedFolders.delete(folderPath);
+            } else {
+                expandedFolders.add(folderPath);
+            }
+            renderTree();
+        }
+        
+        // 展开或收拢当前文件夹及所有子文件夹
+        function toggleExpandAll(folderPath, shouldExpand) {
+            if (shouldExpand) {
+                // 展开当前文件夹及所有子文件夹
+                expandedFolders.add(folderPath);
+                expandAllChildren(folderPath);
+            } else {
+                // 收拢当前文件夹及所有子文件夹
+                expandedFolders.delete(folderPath);
+                collapseAllChildren(folderPath);
+            }
+            renderTree();
+        }
+        
+        // 递归展开所有子文件夹
+        function expandAllChildren(folderPath) {
+            const folder = findFolderByPath(treeData, folderPath);
+            if (folder && folder.children) {
+                folder.children.forEach(child => {
+                    expandedFolders.add(child.path);
+                    if (child.children && child.children.length > 0) {
+                        expandAllChildren(child.path);
+                    }
+                });
+            }
+        }
+        
+        // 递归收拢所有子文件夹
+        function collapseAllChildren(folderPath) {
+            const folder = findFolderByPath(treeData, folderPath);
+            if (folder && folder.children) {
+                folder.children.forEach(child => {
+                    expandedFolders.delete(child.path);
+                    if (child.children && child.children.length > 0) {
+                        collapseAllChildren(child.path);
+                    }
+                });
+            }
+        }
+        
+        // 根据路径查找文件夹
+        function findFolderByPath(items, targetPath) {
+            for (const item of items) {
+                if (item.path === targetPath) {
+                    return item;
+                }
+                if (item.children && item.children.length > 0) {
+                    const found = findFolderByPath(item.children, targetPath);
+                    if (found) return found;
+                }
+            }
+            return null;
+        }
+        
+        // 根目录切换展开/折叠所有
+        function toggleExpandAllRoot() {
+            // 检查是否所有文件夹都已展开
+            const allExpanded = isAllExpanded(treeData);
+            const btn = document.getElementById('rootExpandBtn');
+            
+            if (allExpanded) {
+                // 折叠所有
+                collapseAllRoot();
+                btn.textContent = '⊞';
+                btn.title = '展开所有';
+            } else {
+                // 展开所有
+                expandAllRoot();
+                btn.textContent = '⊟';
+                btn.title = '折叠所有';
+            }
+            renderTree();
+        }
+        
+        // 展开所有根目录下的文件夹
+        function expandAllRoot() {
+            treeData.forEach(item => {
+                expandedFolders.add(item.path);
+                if (item.children && item.children.length > 0) {
+                    expandAllChildren(item.path);
+                }
+            });
+        }
+        
+        // 收拢所有根目录下的文件夹
+        function collapseAllRoot() {
+            treeData.forEach(item => {
+                expandedFolders.delete(item.path);
+                if (item.children && item.children.length > 0) {
+                    collapseAllChildren(item.path);
+                }
+            });
+        }
+        
+        // 检查是否所有文件夹都已展开
+        function isAllExpanded(items) {
+            for (const item of items) {
+                if (!expandedFolders.has(item.path)) {
+                    return false;
+                }
+                if (item.children && item.children.length > 0) {
+                    if (!isAllExpanded(item.children)) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        }
+        
+        // 显示右键菜单
+        function showContextMenu(event, path, name) {
+            event.preventDefault();
+            contextMenuPath = path;
+            contextMenuName = name;
+            
+            const menu = document.getElementById('contextMenu');
+            const deleteItem = document.getElementById('contextDeleteItem');
+            const expandAllItem = document.getElementById('contextExpandAll');
+            const collapseAllItem = document.getElementById('contextCollapseAll');
+            
+            // 根目录不显示删除选项
+            if (path === '') {
+                deleteItem.style.display = 'none';
+                // 根目录也显示展开/收拢选项
+                if (treeData.length > 0) {
+                    expandAllItem.style.display = 'flex';
+                    collapseAllItem.style.display = 'flex';
+                } else {
+                    expandAllItem.style.display = 'none';
+                    collapseAllItem.style.display = 'none';
+                }
+            } else {
+                deleteItem.style.display = 'flex';
+                // 检查是否有子文件夹
+                const folder = findFolderByPath(treeData, path);
+                const hasChildren = folder && folder.children && folder.children.length > 0;
+                
+                if (hasChildren) {
+                    expandAllItem.style.display = 'flex';
+                    collapseAllItem.style.display = 'flex';
+                } else {
+                    expandAllItem.style.display = 'none';
+                    collapseAllItem.style.display = 'none';
+                }
+            }
+            
+            menu.style.left = event.pageX + 'px';
+            menu.style.top = event.pageY + 'px';
+            menu.classList.add('active');
+        }
+        
+        // 隐藏右键菜单
+        function hideContextMenu() {
+            document.getElementById('contextMenu').classList.remove('active');
+        }
+        
+        // 右键菜单：创建文件夹
+        function contextCreateFolder() {
+            hideContextMenu();
+            createSubfolder(contextMenuPath);
+        }
+        
+        // 右键菜单：上传文件
+        function contextUploadFile() {
+            hideContextMenu();
+            // 导航到选中的文件夹
+            navigateTo(contextMenuPath);
+            // 稍微延迟后触发上传，确保路径已更新
+            setTimeout(() => {
+                triggerFileUpload();
+            }, 100);
+        }
+        
+        // 右键菜单：删除文件夹
+        function contextDeleteFolder() {
+            hideContextMenu();
+            deleteFolder(contextMenuPath, contextMenuName);
+        }
+        
+        // 右键菜单：展开所有
+        function contextExpandAll() {
+            hideContextMenu();
+            if (contextMenuPath === '') {
+                expandAllRoot();
+            } else {
+                expandedFolders.add(contextMenuPath);
+                expandAllChildren(contextMenuPath);
+            }
+            renderTree();
+        }
+        
+        // 右键菜单：收拢所有
+        function contextCollapseAll() {
+            hideContextMenu();
+            if (contextMenuPath === '') {
+                collapseAllRoot();
+            } else {
+                expandedFolders.delete(contextMenuPath);
+                collapseAllChildren(contextMenuPath);
+            }
+            renderTree();
+        }
+        
+        // 创建子文件夹
+        function createSubfolder(parentPath) {
+            createFolderTargetPath = parentPath;
+            const pathDisplay = parentPath === '' ? '根目录' : `根目录 / ${parentPath}`;
+            document.getElementById('modalPath').textContent = pathDisplay;
+            showCreateFolderModal();
+        }
+        
+        // 从树上删除文件夹
+        async function deleteFolder(folderPath, folderName) {
+            showConfirmDialog('确定要删除这个文件夹吗？', folderName, '文件夹', folderPath, async () => {
+                try {
+                    const response = await fetch(`/api/delete?path=${encodeURIComponent(folderPath)}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
+                        // 先重新加载树数据
+                        await loadTree();
+                        
+                        // 如果删除的是当前目录或其父目录，返回到根目录
+                        if (currentPath === folderPath || currentPath.startsWith(folderPath + '/')) {
+                            navigateTo('');
+                        } else {
+                            // 保持父文件夹展开状态
+                            const parentPath = folderPath.split('/').slice(0, -1).join('/');
+                            if (parentPath) {
+                                expandedFolders.add(parentPath);
+                            }
+                            renderTree();
+                            await loadFiles();
+                        }
+                    } else {
+                        const data = await response.json();
+                        alert(data.error || '删除失败');
+                    }
+                } catch (error) {
+                    console.error('删除失败:', error);
+                    alert('删除失败');
+                }
+            });
+        }
+        
+        // 加载文件列表
+        async function loadFiles() {
+            try {
+                const response = await fetch(`/api/files?path=${encodeURIComponent(currentPath)}`);
+                const data = await response.json();
+                
+                displayFiles(data);
+                updateBreadcrumb();
+                updateBackButton();
+            } catch (error) {
+                console.error('加载文件列表失败:', error);
+                document.getElementById('fileList').innerHTML = '<div class="empty">加载失败</div>';
+            }
+        }
+        
+        // 显示文件列表
+        function displayFiles(data) {
+            const fileList = document.getElementById('fileList');
+            
+            if (data.folders.length === 0 && data.files.length === 0) {
+                fileList.innerHTML = '<div class="empty">当前文件夹为空</div>';
+                return;
+            }
+            
+            let html = '';
+            
+            // 显示文件夹
+            data.folders.forEach(folder => {
+                // 根据是否为空显示不同图标和颜色
+                const folderIcon = folder.isEmpty ? '📂' : '📁';
+                const iconClass = folder.isEmpty ? '' : 'has-content';
+                
+                html += `
+                    <div class="item folder">
+                        <div class="item-icon ${iconClass}">${folderIcon}</div>
+                        <div class="item-info">
+                            <div class="item-name" onclick="openFolder('${folder.name}')">${folder.name}</div>
+                            <div class="item-meta">文件夹</div>
+                        </div>
+                        <div class="item-actions">
+                            <button class="delete-btn" onclick="deleteItem('${folder.name}', true)">删除</button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            // 显示文件
+            data.files.forEach(file => {
+                const size = formatFileSize(file.size);
+                const date = new Date(file.modified).toLocaleString('zh-CN');
+                html += `
+                    <div class="item">
+                        <div class="item-icon">📄</div>
+                        <div class="item-info">
+                            <div class="item-name">${file.name}</div>
+                            <div class="item-meta">${size} · ${date}</div>
+                        </div>
+                        <div class="item-actions">
+                            <button class="secondary" onclick="downloadFile('${file.name}')">下载</button>
+                            <button class="delete-btn" onclick="deleteItem('${file.name}', false)">删除</button>
+                        </div>
+                    </div>
+                `;
+            });
+            
+            fileList.innerHTML = html;
+        }
+        
+        // 格式化文件大小
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
+        }
+        
+        // 打开文件夹
+        function openFolder(folderName) {
+            currentPath = currentPath ? `${currentPath}/${folderName}` : folderName;
+            loadFiles();
+        }
+        
+        // 返回上级目录
+        function goBack() {
+            const parts = currentPath.split('/');
+            parts.pop();
+            currentPath = parts.join('/');
+            loadFiles();
+        }
+        
+        // 更新面包屑导航
+        function updateBreadcrumb() {
+            const breadcrumb = document.getElementById('breadcrumb');
+            
+            if (!currentPath) {
+                breadcrumb.innerHTML = '根目录';
+                return;
+            }
+            
+            const parts = currentPath.split('/');
+            let html = '<span onclick="navigateTo(\'\')">根目录</span>';
+            
+            let path = '';
+            parts.forEach((part, index) => {
+                path = path ? `${path}/${part}` : part;
+                html += ` / <span onclick="navigateTo('${path}')">${part}</span>`;
+            });
+            
+            breadcrumb.innerHTML = html;
+        }
+        
+        // 导航到指定路径
+        function navigateTo(path) {
+            currentPath = path;
+            updateBreadcrumb();
+            updateBackButton();
+            loadFiles();
+            renderTree(); // 重新渲染树以更新高亮状态
+        }
+        
+        // 更新返回按钮
+        function updateBackButton() {
+            const backBtn = document.getElementById('backBtn');
+            backBtn.style.display = currentPath ? 'block' : 'none';
+        }
+        
+        // 触发文件上传
+        function triggerFileUpload() {
+            document.getElementById('fileInput').click();
+        }
+        
+        // 上传文件
+        async function uploadFile() {
+            const input = document.getElementById('fileInput');
+            const files = input.files;
+            
+            if (files.length === 0) return;
+            
+            for (let i = 0; i < files.length; i++) {
+                const formData = new FormData();
+                formData.append('file', files[i]);
+                
+                try {
+                    // 将路径作为URL参数传递
+                    const response = await fetch(`/api/upload?path=${encodeURIComponent(currentPath)}`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (response.ok) {
+                        console.log(`${files[i].name} 上传成功`);
+                    } else {
+                        alert(`${files[i].name} 上传失败`);
+                    }
+                } catch (error) {
+                    console.error('上传失败:', error);
+                    alert(`${files[i].name} 上传失败`);
+                }
+            }
+            
+            input.value = '';
+            loadTree();
+            loadFiles();
+        }
+        
+        // 显示创建文件夹模态框
+        function showCreateFolder() {
+            createFolderTargetPath = currentPath;
+            const pathDisplay = currentPath === '' ? '根目录' : `根目录 / ${currentPath}`;
+            document.getElementById('modalPath').textContent = pathDisplay;
+            showCreateFolderModal();
+        }
+        
+        // 显示模态框（公共方法）
+        function showCreateFolderModal() {
+            document.getElementById('createFolderModal').classList.add('active');
+            document.getElementById('folderNameInput').focus();
+        }
+        
+        // 关闭模态框
+        function closeModal() {
+            document.getElementById('createFolderModal').classList.remove('active');
+            document.getElementById('folderNameInput').value = '';
+            createFolderTargetPath = null;
+        }
+        
+        // 创建文件夹
+        async function createFolder() {
+            const name = document.getElementById('folderNameInput').value.trim();
+            
+            if (!name) {
+                alert('请输入文件夹名称');
+                return;
+            }
+            
+            // 使用目标路径（从树上点击的）或当前路径
+            const targetPath = createFolderTargetPath !== null ? createFolderTargetPath : currentPath;
+            
+            try {
+                const response = await fetch('/api/mkdir', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        path: targetPath,
+                        name: name
+                    })
+                });
+                
+                if (response.ok) {
+                    // 展开父文件夹
+                    if (targetPath) {
+                        expandedFolders.add(targetPath);
+                    }
+                    closeModal();
+                    loadTree();
+                    loadFiles();
+                } else {
+                    const data = await response.json();
+                    alert(data.error || '创建失败');
+                }
+            } catch (error) {
+                console.error('创建文件夹失败:', error);
+                alert('创建失败');
+            }
+        }
+        
+        // 下载文件
+        function downloadFile(fileName) {
+            const filePath = currentPath ? `${currentPath}/${fileName}` : fileName;
+            window.location.href = `/api/download?path=${encodeURIComponent(filePath)}`;
+        }
+        
+        // 删除文件或文件夹
+        async function deleteItem(name, isFolder) {
+            const itemType = isFolder ? '文件夹' : '文件';
+            showConfirmDialog(`确定要删除这个${itemType}吗？`, name, itemType, currentPath, async () => {
+                const itemPath = currentPath ? `${currentPath}/${name}` : name;
+                
+                try {
+                    const response = await fetch(`/api/delete?path=${encodeURIComponent(itemPath)}`, {
+                        method: 'DELETE'
+                    });
+                    
+                    if (response.ok) {
+                        loadTree();
+                        loadFiles();
+                    } else {
+                        const data = await response.json();
+                        alert(data.error || '删除失败');
+                    }
+                } catch (error) {
+                    console.error('删除失败:', error);
+                    alert('删除失败');
+                }
+            });
+        }
+        
+        // 刷新文件列表
+        function refreshFiles() {
+            loadFiles();
+        }
+        
+        // 刷新所有（目录树和文件列表）
+        function refreshAll() {
+            loadTree();
+            loadFiles();
+        }
+        
+        // 按 Enter 键创建文件夹
+        document.getElementById('folderNameInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                createFolder();
+            }
+        });
+        
+        // 点击模态框外部关闭
+        document.getElementById('createFolderModal').addEventListener('click', (e) => {
+            if (e.target.id === 'createFolderModal') {
+                closeModal();
+            }
+        });
+        
+        // 点击确认对话框外部关闭
+        document.getElementById('confirmDialog').addEventListener('click', (e) => {
+            if (e.target.id === 'confirmDialog') {
+                closeConfirmDialog();
+            }
+        });
+        
+        // 点击日志模态框外部关闭
+        document.getElementById('logModal').addEventListener('click', (e) => {
+            if (e.target.id === 'logModal') {
+                closeLogs();
+            }
+        });
+        
+        // 点击帮助模态框外部关闭
+        document.getElementById('helpModal').addEventListener('click', (e) => {
+            if (e.target.id === 'helpModal') {
+                closeHelp();
+            }
+        });
+        
+        // 点击页面其他地方关闭右键菜单
+        document.addEventListener('click', () => {
+            hideContextMenu();
+        });
+        
+        // 防止右键菜单内点击关闭菜单
+        document.getElementById('contextMenu').addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+        
+        // 拖动调整侧边栏宽度
+        const resizer = document.getElementById('resizer');
+        const sidebar = document.getElementById('sidebar');
+        let isResizing = false;
+        
+        resizer.addEventListener('mousedown', (e) => {
+            isResizing = true;
+            resizer.classList.add('resizing');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (!isResizing) return;
+            
+            const newWidth = e.clientX;
+            if (newWidth >= 200 && newWidth <= 600) {
+                sidebar.style.width = newWidth + 'px';
+            }
+        });
+        
+        document.addEventListener('mouseup', () => {
+            if (isResizing) {
+                isResizing = false;
+                resizer.classList.remove('resizing');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+            }
+        });
+    </script>
+</body>
+</html>
