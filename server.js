@@ -287,6 +287,47 @@ app.delete('/api/delete', (req, res) => {
     }
 });
 
+// 重命名文件夹
+app.put('/api/rename', (req, res) => {
+    const { oldPath, newName } = req.body;
+    
+    if (!oldPath || !newName) {
+        return res.status(400).json({ error: '参数不完整' });
+    }
+    
+    // 验证新名称不包含路径分隔符
+    if (newName.includes('/') || newName.includes('\\')) {
+        return res.status(400).json({ error: '名称不能包含路径分隔符' });
+    }
+    
+    const oldFullPath = path.join(UPLOAD_DIR, oldPath);
+    
+    // 计算新路径：保持相同的父目录
+    const parentDir = path.dirname(oldPath);
+    const newPath = parentDir === '.' ? newName : path.join(parentDir, newName);
+    const newFullPath = path.join(UPLOAD_DIR, newPath);
+    
+    try {
+        if (!fs.existsSync(oldFullPath)) {
+            return res.status(404).json({ error: '文件夹不存在' });
+        }
+        
+        if (fs.existsSync(newFullPath)) {
+            return res.status(400).json({ error: '目标名称已存在' });
+        }
+        
+        fs.renameSync(oldFullPath, newFullPath);
+        
+        const oldPathDisplay = oldPath ? `根目录 / ${oldPath}` : '根目录';
+        const newPathDisplay = newPath ? `根目录 / ${newPath}` : '根目录';
+        addLog(req, '重命名文件夹', `${oldPathDisplay} → ${newPathDisplay}`);
+        
+        res.json({ message: '重命名成功', newPath });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 app.listen(PORT, () => {
     console.log(`\n服务器已启动！`);
     console.log(`本地访问: http://localhost:${PORT}`);

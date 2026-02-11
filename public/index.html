@@ -570,6 +570,11 @@
             background: rgba(156, 39, 176, 0.1);
         }
         
+        .log-action.rename {
+            color: #FF9800;
+            background: rgba(255, 152, 0, 0.1);
+        }
+        
         .log-details {
             color: #2196F3;
             font-weight: 500;
@@ -766,6 +771,7 @@
                         <li style="margin-bottom: 8px;"><strong>文件上传：</strong>点击"上传文件"按钮，可选择单个或多个文件上传到当前文件夹</li>
                         <li style="margin-bottom: 8px;"><strong>文件下载：</strong>点击文件旁的"下载"按钮即可下载文件</li>
                         <li style="margin-bottom: 8px;"><strong>创建文件夹：</strong>点击"新建文件夹"按钮，在弹出的对话框中输入文件夹名称</li>
+                        <li style="margin-bottom: 8px;"><strong>重命名文件夹：</strong>点击文件夹旁的"✎"按钮或右键选择"重命名"，即可修改文件夹名称</li>
                         <li style="margin-bottom: 8px;"><strong>删除文件/文件夹：</strong>点击"删除"按钮，确认后即可删除（文件夹会删除所有内容）</li>
                         <li style="margin-bottom: 8px;"><strong>操作日志：</strong>点击右上角"日志"按钮，查看所有操作记录</li>
                     </ul>
@@ -777,6 +783,7 @@
                         <li style="margin-bottom: 8px;"><strong>快捷操作：</strong>鼠标悬停在文件夹上时，右侧会显示操作按钮
                             <ul style="padding-left: 20px; margin-top: 5px;">
                                 <li>⊞/⊟ 展开/折叠所有子文件夹</li>
+                                <li>✎ 重命名文件夹</li>
                                 <li>+ 创建子文件夹</li>
                                 <li>× 删除文件夹</li>
                             </ul>
@@ -827,6 +834,26 @@
         </div>
     </div>
     
+    <!-- 重命名文件夹模态框 -->
+    <div class="modal" id="renameFolderModal">
+        <div class="modal-content">
+            <h2>重命名文件夹</h2>
+            <div class="confirm-item" style="margin-bottom: 16px;">
+                <span class="confirm-label">位置：</span>
+                <span class="confirm-path" id="renamePathDisplay">根目录</span>
+            </div>
+            <div class="confirm-item" style="margin-bottom: 16px;">
+                <span class="confirm-label">原名称：</span>
+                <span class="confirm-value" id="renameOldName"></span>
+            </div>
+            <input type="text" id="renameInput" placeholder="输入新名称">
+            <div class="modal-buttons">
+                <button class="cancel-btn" onclick="closeRenameModal()">取消</button>
+                <button onclick="confirmRename()">重命名</button>
+            </div>
+        </div>
+    </div>
+    
     <!-- 右键菜单 -->
     <div class="context-menu" id="contextMenu">
         <div class="context-menu-item" onclick="contextCreateFolder()">
@@ -836,6 +863,10 @@
         <div class="context-menu-item" onclick="contextUploadFile()">
             <span>📤</span>
             <span>上传文件到此处</span>
+        </div>
+        <div class="context-menu-item" id="contextRenameItem" onclick="contextRenameFolder()">
+            <span>✎</span>
+            <span>重命名</span>
         </div>
         <div class="context-menu-item" id="contextExpandAll" onclick="contextExpandAll()">
             <span>⊞</span>
@@ -849,6 +880,7 @@
             <span>🗑️</span>
             <span>删除文件夹</span>
         </div>
+    </div>
     </div>
     
     <script>
@@ -951,6 +983,8 @@
                         actionClass = 'delete-folder';
                     } else if (log.action === '创建文件夹') {
                         actionClass = 'create';
+                    } else if (log.action === '重命名文件夹') {
+                        actionClass = 'rename';
                     }
                     
                     html += `
@@ -1054,6 +1088,7 @@
                             <span>${item.name}</span>
                             <div class="tree-item-actions">
                                 ${hasChildren ? `<button class="tree-action-btn" onclick="event.stopPropagation(); toggleExpandAll('${item.path}', ${!isExpanded})" title="${isExpanded ? '折叠所有' : '展开所有'}">${expandIcon}</button>` : ''}
+                                <button class="tree-action-btn" onclick="event.stopPropagation(); renameFolder('${item.path}', '${item.name}')" title="重命名">✎</button>
                                 <button class="tree-action-btn" onclick="event.stopPropagation(); createSubfolder('${item.path}')" title="创建子文件夹">+</button>
                                 <button class="tree-action-btn delete" onclick="event.stopPropagation(); deleteFolder('${item.path}', '${item.name}')" title="删除文件夹">×</button>
                             </div>
@@ -1195,10 +1230,12 @@
             const deleteItem = document.getElementById('contextDeleteItem');
             const expandAllItem = document.getElementById('contextExpandAll');
             const collapseAllItem = document.getElementById('contextCollapseAll');
+            const renameItem = document.getElementById('contextRenameItem');
             
-            // 根目录不显示删除选项
+            // 根目录不显示删除和重命名选项
             if (path === '') {
                 deleteItem.style.display = 'none';
+                renameItem.style.display = 'none';
                 // 根目录也显示展开/收拢选项
                 if (treeData.length > 0) {
                     expandAllItem.style.display = 'flex';
@@ -1209,6 +1246,7 @@
                 }
             } else {
                 deleteItem.style.display = 'flex';
+                renameItem.style.display = 'flex';
                 // 检查是否有子文件夹
                 const folder = findFolderByPath(treeData, path);
                 const hasChildren = folder && folder.children && folder.children.length > 0;
@@ -1253,6 +1291,12 @@
         function contextDeleteFolder() {
             hideContextMenu();
             deleteFolder(contextMenuPath, contextMenuName);
+        }
+        
+        // 右键菜单：重命名文件夹
+        function contextRenameFolder() {
+            hideContextMenu();
+            renameFolder(contextMenuPath, contextMenuName);
         }
         
         // 右键菜单：展开所有
@@ -1557,6 +1601,78 @@
             window.location.href = `/api/download?path=${encodeURIComponent(filePath)}`;
         }
         
+        // 重命名文件夹
+        let renameFolderPath = '';
+        
+        function renameFolder(folderPath, folderName) {
+            renameFolderPath = folderPath;
+            
+            // 设置位置显示
+            const parentPath = folderPath.split('/').slice(0, -1).join('/');
+            const pathDisplay = parentPath === '' ? '根目录' : `根目录 / ${parentPath}`;
+            document.getElementById('renamePathDisplay').textContent = pathDisplay;
+            
+            document.getElementById('renameOldName').textContent = folderName;
+            document.getElementById('renameInput').value = folderName;
+            document.getElementById('renameFolderModal').classList.add('active');
+            document.getElementById('renameInput').focus();
+            document.getElementById('renameInput').select();
+        }
+        
+        function closeRenameModal() {
+            document.getElementById('renameFolderModal').classList.remove('active');
+            document.getElementById('renameInput').value = '';
+            renameFolderPath = '';
+        }
+        
+        async function confirmRename() {
+            const newName = document.getElementById('renameInput').value.trim();
+            
+            if (!newName) {
+                alert('请输入新名称');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/rename', {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        oldPath: renameFolderPath,
+                        newName: newName
+                    })
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    closeRenameModal();
+                    
+                    // 如果重命名的是当前路径或其父路径，需要更新当前路径
+                    if (currentPath === renameFolderPath || currentPath.startsWith(renameFolderPath + '/')) {
+                        // 替换当前路径中的旧名称
+                        currentPath = currentPath.replace(renameFolderPath, data.newPath);
+                    }
+                    
+                    // 保持展开状态
+                    if (expandedFolders.has(renameFolderPath)) {
+                        expandedFolders.delete(renameFolderPath);
+                        expandedFolders.add(data.newPath);
+                    }
+                    
+                    await loadTree();
+                    await loadFiles();
+                } else {
+                    const data = await response.json();
+                    alert(data.error || '重命名失败');
+                }
+            } catch (error) {
+                console.error('重命名失败:', error);
+                alert('重命名失败');
+            }
+        }
+        
         // 删除文件或文件夹
         async function deleteItem(name, isFolder) {
             const itemType = isFolder ? '文件夹' : '文件';
@@ -1600,10 +1716,24 @@
             }
         });
         
+        // 按 Enter 键重命名
+        document.getElementById('renameInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                confirmRename();
+            }
+        });
+        
         // 点击模态框外部关闭
         document.getElementById('createFolderModal').addEventListener('click', (e) => {
             if (e.target.id === 'createFolderModal') {
                 closeModal();
+            }
+        });
+        
+        // 点击重命名模态框外部关闭
+        document.getElementById('renameFolderModal').addEventListener('click', (e) => {
+            if (e.target.id === 'renameFolderModal') {
+                closeRenameModal();
             }
         });
         
