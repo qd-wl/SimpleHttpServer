@@ -7,7 +7,14 @@ const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const UPLOAD_DIR = path.join(__dirname, 'uploads');
-const LOGS_DIR = path.join(__dirname, 'logs');
+const LOGS_DIR   = path.join(__dirname, 'logs');
+const TRASH_DIR  = path.join(__dirname, 'trash');
+const TRASH_META = path.join(TRASH_DIR, '_meta.json');
+
+// 确保回收站目录存在
+if (!fs.existsSync(TRASH_DIR)) {
+    fs.mkdirSync(TRASH_DIR, { recursive: true });
+}
 
 // 确保日志目录存在
 if (!fs.existsSync(LOGS_DIR)) {
@@ -91,6 +98,20 @@ function addLog(req, action, details = '') {
     console.log(`[${log.timestamp}] ${log.ip} - ${action} ${details}`);
 }
 
+// 回收站元数据读写
+function loadTrashMeta() {
+    try {
+        if (fs.existsSync(TRASH_META)) {
+            return JSON.parse(fs.readFileSync(TRASH_META, 'utf8'));
+        }
+    } catch (e) {}
+    return {};
+}
+
+function saveTrashMeta(meta) {
+    fs.writeFileSync(TRASH_META, JSON.stringify(meta, null, 2), 'utf8');
+}
+
 // 启动时加载历史日志
 loadLogs();
 
@@ -111,8 +132,25 @@ const storage = multer.diskStorage({
         cb(null, targetDir);
     },
     filename: (req, file, cb) => {
-        // 使用原始文件名
-        cb(null, Buffer.from(file.originalname, 'latin1').toString('utf8'));
+        const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+        const mode = req.query.mode || 'replace';
+        
+        if (mode === 'keep') {
+            const subPath = req.query.path || '';
+            const targetDir = path.join(UPLOAD_DIR, subPath);
+            const ext = path.extname(originalName);
+            const base = path.basename(originalName, ext);
+            let counter = 2;
+            let newName = originalName;
+            while (fs.existsSync(path.join(targetDir, newName))) {
+                newName = `${base} ${counter}${ext}`;
+                counter++;
+            }
+            cb(null, newName);
+        } else {
+            // replace: 直接覆盖
+            cb(null, originalName);
+        }
     }
 });
 
@@ -215,6 +253,15 @@ app.get('/api/files', (req, res) => {
     }
 });
 
+// 检查文件是否存在
+app.get('/api/check-file', (req, res) => {
+    const subPath = req.query.path || '';
+    const name = req.query.name;
+    if (!name) return res.status(400).json({ error: '参数缺失' });
+    const fullPath = path.join(UPLOAD_DIR, subPath, name);
+    res.json({ exists: fs.existsSync(fullPath) });
+});
+
 // 上传文件
 app.post('/api/upload', upload.single('file'), (req, res) => {
     if (!req.file) {
@@ -261,27 +308,141 @@ app.get('/api/download', (req, res) => {
     res.download(fullPath);
 });
 
-// 删除文件或文件夹
+// 删除文件或文件夹（移入回收站）
 app.delete('/api/delete', (req, res) => {
     const itemPath = req.query.path;
+    if (!itemPath || itemPath.includes('..')) {
+        return res.status(400).json({ error: '无效路径' });
+    }
     const fullPath = path.join(UPLOAD_DIR, itemPath);
-    
+    if (!fullPath.startsWith(UPLOAD_DIR + path.sep)) {
+        return res.status(400).json({ error: '无效路径' });
+    }
+
     try {
         if (!fs.existsSync(fullPath)) {
             return res.status(404).json({ error: '文件不存在' });
         }
-        
-        const pathDisplay = itemPath ? `根目录 / ${itemPath}` : '根目录';
+
         const stat = fs.statSync(fullPath);
-        if (stat.isDirectory()) {
-            fs.rmSync(fullPath, { recursive: true });
-            addLog(req, '删除文件夹', pathDisplay);
-        } else {
-            fs.unlinkSync(fullPath);
-            addLog(req, '删除文件', pathDisplay);
+        const isFolder = stat.isDirectory();
+        const originalName = path.basename(itemPath);
+        const trashId = Date.now().toString();
+        const trashFileName = `${trashId}_${originalName}`;
+        const trashPath = path.join(TRASH_DIR, trashFileName);
+
+        // 移入回收站
+        fs.renameSync(fullPath, trashPath);
+
+        // 更新元数据
+        const meta = loadTrashMeta();
+        meta[trashId] = {
+            trashFileName,
+            originalPath: itemPath,
+            originalName,
+            deletedAt: new Date().toISOString(),
+            isFolder,
+            size: isFolder ? 0 : stat.size
+        };
+        saveTrashMeta(meta);
+
+        const pathDisplay = `根目录 / ${itemPath}`;
+        addLog(req, isFolder ? '删除文件夹' : '删除文件', `${pathDisplay} → 回收站`);
+        res.json({ message: '已移入回收站' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ── 回收站 API ────────────────────────────────────────────────
+
+// 获取回收站列表
+app.get('/api/trash', (req, res) => {
+    const meta = loadTrashMeta();
+    const items = Object.entries(meta).map(([id, info]) => ({ id, ...info }))
+        .sort((a, b) => new Date(b.deletedAt) - new Date(a.deletedAt));
+    res.json(items);
+});
+
+// 还原
+app.post('/api/trash/restore', (req, res) => {
+    const { id } = req.body;
+    const meta = loadTrashMeta();
+    if (!meta[id]) return res.status(404).json({ error: '找不到该条目' });
+
+    const item = meta[id];
+    const trashPath  = path.join(TRASH_DIR, item.trashFileName);
+    const restorePath = path.join(UPLOAD_DIR, item.originalPath);
+
+    if (!fs.existsSync(trashPath)) {
+        delete meta[id]; saveTrashMeta(meta);
+        return res.status(404).json({ error: '回收站文件已丢失' });
+    }
+
+    // 确保父目录存在
+    fs.mkdirSync(path.dirname(restorePath), { recursive: true });
+
+    // 如果目标已存在，自动重命名
+    let finalPath = restorePath;
+    if (fs.existsSync(restorePath)) {
+        const ext  = path.extname(item.originalName);
+        const base = path.basename(item.originalName, ext);
+        let n = 2;
+        while (fs.existsSync(finalPath)) {
+            finalPath = path.join(path.dirname(restorePath), `${base} ${n}${ext}`);
+            n++;
         }
-        
-        res.json({ message: '删除成功' });
+    }
+
+    fs.renameSync(trashPath, finalPath);
+    delete meta[id];
+    saveTrashMeta(meta);
+    addLog(req, '还原文件', item.originalPath);
+    res.json({ message: '还原成功' });
+});
+
+// 从回收站彻底删除
+app.delete('/api/trash/delete', (req, res) => {
+    const id = req.query.id;
+    const meta = loadTrashMeta();
+    if (!meta[id]) return res.status(404).json({ error: '找不到该条目' });
+
+    const item = meta[id];
+    const trashPath = path.join(TRASH_DIR, item.trashFileName);
+    try {
+        if (fs.existsSync(trashPath)) {
+            if (item.isFolder) {
+                fs.rmSync(trashPath, { recursive: true });
+            } else {
+                fs.unlinkSync(trashPath);
+            }
+        }
+        delete meta[id];
+        saveTrashMeta(meta);
+        addLog(req, '彻底删除', item.originalPath);
+        res.json({ message: '已彻底删除' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// 清空回收站
+app.delete('/api/trash/clear', (req, res) => {
+    const meta = loadTrashMeta();
+    try {
+        for (const [, item] of Object.entries(meta)) {
+            const trashPath = path.join(TRASH_DIR, item.trashFileName);
+            if (fs.existsSync(trashPath)) {
+                if (item.isFolder) {
+                    fs.rmSync(trashPath, { recursive: true });
+                } else {
+                    fs.unlinkSync(trashPath);
+                }
+            }
+        }
+        saveTrashMeta({});
+        addLog(req, '清空回收站', '');
+        res.json({ message: '回收站已清空' });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }

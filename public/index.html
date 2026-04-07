@@ -206,13 +206,63 @@
         }
         
         .file-list {
-            padding: 20px;
+            padding: 0;
         }
-        
+
+        /* 排序表头 */
+        .sort-header {
+            display: flex;
+            align-items: center;
+            padding: 0 12px;
+            background: #f4f4f4;
+            border-bottom: 2px solid #e0e0e0;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            user-select: none;
+        }
+
+        .sort-col {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            padding: 10px 8px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #555;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        .sort-col:hover {
+            color: #333;
+        }
+
+        .sort-col.active {
+            color: #2196F3;
+        }
+
+        .sort-arrow {
+            font-size: 11px;
+            opacity: 0.4;
+        }
+
+        .sort-col.active .sort-arrow {
+            opacity: 1;
+        }
+
+        /* 列宽定义 */
+        .col-icon    { width: 52px;  flex-shrink: 0; }
+        .col-name    { flex: 1;      min-width: 0; }
+        .col-type    { width: 80px;  flex-shrink: 0; }
+        .col-size    { width: 100px; flex-shrink: 0; }
+        .col-date    { width: 165px; flex-shrink: 0; }
+        .col-actions { width: 130px; flex-shrink: 0; }
+
         .item {
             display: flex;
             align-items: center;
-            padding: 12px;
+            padding: 10px 12px;
             border-bottom: 1px solid #f0f0f0;
             transition: background 0.2s;
         }
@@ -224,44 +274,53 @@
         .item-icon {
             width: 40px;
             height: 40px;
-            margin-right: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 24px;
+            font-size: 22px;
+            flex-shrink: 0;
         }
         
         .item-icon.has-content {
             filter: sepia(100%) saturate(500%) hue-rotate(190deg) brightness(0.9);
         }
         
-        .item-info {
-            flex: 1;
-        }
-        
         .item-name {
             font-weight: 500;
             cursor: pointer;
             color: #333;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
         
         .item-name:hover {
             text-decoration: underline;
         }
-        
-        .item-meta {
+
+        .item-type {
             font-size: 12px;
             color: #999;
-            margin-top: 4px;
+        }
+
+        .item-size {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .item-date {
+            font-size: 12px;
+            color: #666;
         }
         
         .item-actions {
             display: flex;
-            gap: 8px;
+            gap: 6px;
+            justify-content: flex-end;
         }
         
         .item-actions button {
-            padding: 6px 12px;
+            padding: 5px 10px;
             font-size: 12px;
         }
         
@@ -574,6 +633,21 @@
             color: #FF9800;
             background: rgba(255, 152, 0, 0.1);
         }
+
+        .log-action.restore {
+            color: #00897B;
+            background: rgba(0, 137, 123, 0.1);
+        }
+
+        .log-action.purge {
+            color: #B71C1C;
+            background: rgba(183, 28, 28, 0.12);
+        }
+
+        .log-action.clear-trash {
+            color: #6D4C41;
+            background: rgba(109, 76, 65, 0.1);
+        }
         
         .log-details {
             color: #2196F3;
@@ -596,6 +670,180 @@
             background: #777;
         }
         
+        /* 冲突处理对话框 */
+        .conflict-dialog {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 4000;
+        }
+
+        .conflict-dialog.active {
+            display: flex;
+        }
+
+        .conflict-content {
+            background: white;
+            padding: 24px;
+            border-radius: 10px;
+            width: 420px;
+            max-width: 90%;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+        }
+
+        .conflict-title {
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 14px;
+            color: #333;
+        }
+
+        .conflict-body {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 8px;
+            line-height: 1.6;
+        }
+
+        .conflict-filename {
+            display: block;
+            margin-top: 6px;
+            padding: 8px 12px;
+            background: #f5f5f5;
+            border-radius: 4px;
+            font-weight: 600;
+            color: #2196F3;
+            word-break: break-all;
+        }
+
+        .conflict-hint {
+            font-size: 12px;
+            color: #999;
+            margin-top: 12px;
+            padding: 8px 12px;
+            background: #fff8e1;
+            border-left: 3px solid #FFB300;
+            border-radius: 4px;
+        }
+
+        .conflict-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: flex-end;
+            margin-top: 20px;
+        }
+
+        /* 上传进度模态框 */
+        .upload-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+        }
+
+        .upload-modal.active {
+            display: flex;
+        }
+
+        .upload-modal-content {
+            background: white;
+            padding: 28px 28px 24px;
+            border-radius: 10px;
+            width: 420px;
+            max-width: 90%;
+            box-shadow: 0 6px 24px rgba(0,0,0,0.18);
+        }
+
+        .upload-modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 16px;
+            color: #333;
+        }
+
+        .upload-file-count {
+            font-size: 13px;
+            color: #999;
+            margin-bottom: 6px;
+        }
+
+        .upload-file-name {
+            font-size: 14px;
+            color: #555;
+            margin-bottom: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .progress-bar-container {
+            width: 100%;
+            height: 10px;
+            background: #e8e8e8;
+            border-radius: 5px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .progress-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4CAF50, #81C784);
+            border-radius: 5px;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        .progress-percentage {
+            font-size: 13px;
+            color: #4CAF50;
+            font-weight: 600;
+            text-align: right;
+        }
+
+        /* Toast 通知 */
+        .toast {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            background: #323232;
+            color: white;
+            padding: 13px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 9999;
+            transform: translateX(130%);
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), visibility 0s 0.35s;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.22);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            max-width: 360px;
+            word-break: break-all;
+            visibility: hidden;
+        }
+
+        .toast.show {
+            transform: translateX(0);
+            visibility: visible;
+            transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), visibility 0s 0s;
+        }
+
+        .toast.success { background: #43A047; }
+        .toast.danger  { background: #e53935; }
+        .toast.error   { background: #e53935; }
+
         #fileInput {
             display: none;
         }
@@ -685,6 +933,81 @@
             background: transparent;
             z-index: 100;
         }
+
+        /* 回收站模态框 */
+        .trash-item {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            border-bottom: 1px solid #f0f0f0;
+            font-size: 13px;
+        }
+
+        .trash-item:hover {
+            background: #f9f9f9;
+        }
+
+        .trash-item-icon {
+            font-size: 24px;
+            flex-shrink: 0;
+        }
+
+        .trash-item-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .trash-item-name {
+            font-weight: 600;
+            color: #333;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .trash-item-meta {
+            color: #999;
+            margin-top: 2px;
+            font-size: 12px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .trash-item-path {
+            color: #2196F3;
+            font-size: 12px;
+            margin-top: 2px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .trash-item-actions {
+            display: flex;
+            gap: 6px;
+            flex-shrink: 0;
+        }
+
+        .trash-item-actions button {
+            padding: 5px 10px;
+            font-size: 12px;
+        }
+
+        .restore-btn {
+            background: #4CAF50;
+        }
+
+        .restore-btn:hover {
+            background: #45a049;
+        }
+
+        .trash-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
     </style>
 </head>
 <body>
@@ -716,6 +1039,7 @@
                 <div style="display: flex; gap: 10px;">
                     <button class="log-btn" onclick="showHelp()" title="查看使用帮助">ℹ️ 帮助</button>
                     <button class="log-btn" onclick="showLogs()" title="查看操作日志">📋 日志</button>
+                    <button class="log-btn" onclick="showTrash()" title="回收站">🗑️ 回收站</button>
                 </div>
             </div>
             
@@ -731,6 +1055,23 @@
             </div>
             
             <div class="content-area">
+                <!-- 排序表头 -->
+                <div class="sort-header" id="sortHeader">
+                    <div class="col-icon"></div>
+                    <div class="sort-col col-name active" id="sortName" onclick="setSortKey('name')">
+                        名称 <span class="sort-arrow" id="arrowName">↑</span>
+                    </div>
+                    <div class="sort-col col-type" id="sortType" onclick="setSortKey('type')">
+                        类型 <span class="sort-arrow" id="arrowType">↑</span>
+                    </div>
+                    <div class="sort-col col-size" id="sortSize" onclick="setSortKey('size')">
+                        大小 <span class="sort-arrow" id="arrowSize">↑</span>
+                    </div>
+                    <div class="sort-col col-date" id="sortDate" onclick="setSortKey('date')">
+                        修改日期 <span class="sort-arrow" id="arrowDate">↑</span>
+                    </div>
+                    <div class="col-actions"></div>
+                </div>
                 <div class="file-list" id="fileList">
                     <div class="loading">加载中...</div>
                 </div>
@@ -741,6 +1082,22 @@
     <!-- 上传文件输入 -->
     <input type="file" id="fileInput" onchange="uploadFile()" multiple>
     
+    <!-- 回收站模态框 -->
+    <div class="log-modal" id="trashModal">
+        <div class="log-content">
+            <div class="log-header">
+                <h2>🗑️ 回收站</h2>
+                <div class="trash-header-actions">
+                    <button id="clearTrashBtn" onclick="clearTrash()" style="background:#e53935;padding:6px 14px;font-size:13px">清空回收站</button>
+                    <button class="log-close" onclick="closeTrash()">×</button>
+                </div>
+            </div>
+            <div class="log-body" id="trashBody">
+                <div class="log-empty">加载中...</div>
+            </div>
+        </div>
+    </div>
+
     <!-- 日志查看模态框 -->
     <div class="log-modal" id="logModal">
         <div class="log-content">
@@ -764,18 +1121,33 @@
             <div class="log-body" style="line-height: 1.8;">
                 <div style="padding: 10px;">
                     <h3 style="color: #4CAF50; margin-bottom: 15px; font-size: 18px;">📁 简单文件服务器</h3>
-                    <p style="color: #666; margin-bottom: 20px;">一个简单易用的网页文件管理工具，支持文件上传、下载、文件夹管理等功能。</p>
-                    
+                    <p style="color: #666; margin-bottom: 20px;">一个简单易用的网页文件管理工具，支持文件上传、下载、文件夹管理、回收站等功能。</p>
+
                     <h4 style="color: #333; margin: 20px 0 10px 0; font-size: 16px;">🎯 主要功能</h4>
                     <ul style="color: #555; padding-left: 25px;">
-                        <li style="margin-bottom: 8px;"><strong>文件上传：</strong>点击"上传文件"按钮，可选择单个或多个文件上传到当前文件夹</li>
+                        <li style="margin-bottom: 8px;"><strong>文件上传：</strong>点击"上传文件"按钮，可选择单个或多个文件。上传时显示实时进度条。若目录中存在同名文件，会弹出提示让你选择<strong>替换</strong>、<strong>保留两者</strong>（自动重命名为"文件名 2"）或<strong>跳过</strong></li>
                         <li style="margin-bottom: 8px;"><strong>文件下载：</strong>点击文件旁的"下载"按钮即可下载文件</li>
                         <li style="margin-bottom: 8px;"><strong>创建文件夹：</strong>点击"新建文件夹"按钮，在弹出的对话框中输入文件夹名称</li>
                         <li style="margin-bottom: 8px;"><strong>重命名文件夹：</strong>点击文件夹旁的"✎"按钮或右键选择"重命名"，即可修改文件夹名称</li>
-                        <li style="margin-bottom: 8px;"><strong>删除文件/文件夹：</strong>点击"删除"按钮，确认后即可删除（文件夹会删除所有内容）</li>
-                        <li style="margin-bottom: 8px;"><strong>操作日志：</strong>点击右上角"日志"按钮，查看所有操作记录</li>
+                        <li style="margin-bottom: 8px;"><strong>删除文件/文件夹：</strong>点击"删除"按钮后，文件会进入<strong>回收站</strong>而非立即删除，可随时还原</li>
+                        <li style="margin-bottom: 8px;"><strong>操作日志：</strong>点击右上角"日志"按钮，查看所有操作记录（含彩色类型标签）</li>
                     </ul>
-                    
+
+                    <h4 style="color: #333; margin: 20px 0 10px 0; font-size: 16px;">🗑️ 回收站</h4>
+                    <ul style="color: #555; padding-left: 25px;">
+                        <li style="margin-bottom: 8px;">点击右上角"回收站"按钮，查看所有已删除的文件和文件夹</li>
+                        <li style="margin-bottom: 8px;"><strong>还原：</strong>将文件/文件夹恢复到原来的位置（若原路径已被占用，自动重命名）</li>
+                        <li style="margin-bottom: 8px;"><strong>彻底删除：</strong>从回收站永久删除，无法恢复，操作前会弹出二次确认</li>
+                        <li style="margin-bottom: 8px;"><strong>清空回收站：</strong>一键删除回收站中的所有内容，操作前会弹出二次确认</li>
+                    </ul>
+
+                    <h4 style="color: #333; margin: 20px 0 10px 0; font-size: 16px;">📊 文件排序</h4>
+                    <ul style="color: #555; padding-left: 25px;">
+                        <li style="margin-bottom: 8px;">文件列表顶部有<strong>名称、类型、大小、修改日期</strong>四个排序列</li>
+                        <li style="margin-bottom: 8px;">点击列标题按该列排序，再次点击切换升序/降序，当前排序列以蓝色高亮显示</li>
+                        <li style="margin-bottom: 8px;">文件夹始终显示在文件前面</li>
+                    </ul>
+
                     <h4 style="color: #333; margin: 20px 0 10px 0; font-size: 16px;">🌲 目录树功能</h4>
                     <ul style="color: #555; padding-left: 25px;">
                         <li style="margin-bottom: 8px;"><strong>点击文件夹：</strong>左键点击文件夹可进入该文件夹，查看其中的文件和子文件夹</li>
@@ -790,16 +1162,16 @@
                         </li>
                         <li style="margin-bottom: 8px;"><strong>右键菜单：</strong>在文件夹上点击鼠标右键，可快速访问更多操作</li>
                     </ul>
-                    
+
                     <h4 style="color: #333; margin: 20px 0 10px 0; font-size: 16px;">💡 使用技巧</h4>
                     <ul style="color: #555; padding-left: 25px;">
                         <li style="margin-bottom: 8px;">面包屑导航可快速跳转到上级目录</li>
-                        <li style="margin-bottom: 8px;">支持拖拽多个文件同时上传</li>
-                        <li style="margin-bottom: 8px;">删除操作不可恢复，请谨慎操作</li>
+                        <li style="margin-bottom: 8px;">同时选择多个文件上传时，遇到同名文件会逐个询问处理方式</li>
+                        <li style="margin-bottom: 8px;">删除的文件默认进入回收站，可以还原；从回收站彻底删除后无法恢复</li>
                     </ul>
-                    
+
                     <div style="margin-top: 30px; padding: 15px; background: #f0f7ff; border-left: 4px solid #2196F3; border-radius: 4px;">
-                        <p style="margin: 0; color: #1976D2; font-size: 14px;">💡 <strong>提示：</strong>所有文件和文件夹都存储在服务器的 uploads 目录下，操作日志保存在 logs 目录中。</p>
+                        <p style="margin: 0; color: #1976D2; font-size: 14px;">💡 <strong>提示：</strong>文件存储在 <code>uploads/</code> 目录，回收站在 <code>trash/</code> 目录，操作日志保存在 <code>logs/</code> 目录。</p>
                     </div>
                 </div>
             </div>
@@ -814,6 +1186,22 @@
             <div class="confirm-buttons">
                 <button class="cancel-btn" onclick="closeConfirmDialog()">取消</button>
                 <button class="delete-btn" onclick="confirmDelete()">确定</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 简易确认对话框（回收站操作） -->
+    <div class="confirm-dialog" id="simpleConfirmDialog" style="z-index:5000">
+        <div class="confirm-content">
+            <div class="confirm-title" id="simpleConfirmTitle"></div>
+            <div id="simpleConfirmBody" style="font-size:14px;color:#555;margin-bottom:4px"></div>
+            <div class="confirm-warning" style="margin-top:12px">
+                <span class="confirm-warning-icon">⚠️</span>
+                <span class="confirm-warning-text" id="simpleConfirmWarn">此操作无法撤销！</span>
+            </div>
+            <div class="confirm-buttons">
+                <button class="cancel-btn" onclick="closeSimpleConfirm()">取消</button>
+                <button class="delete-btn" id="simpleConfirmOkBtn" onclick="doSimpleConfirm()">确定</button>
             </div>
         </div>
     </div>
@@ -854,6 +1242,39 @@
         </div>
     </div>
     
+    <!-- 冲突处理对话框 -->
+    <div class="conflict-dialog" id="conflictDialog">
+        <div class="conflict-content">
+            <div class="conflict-title">⚠️ 文件已存在</div>
+            <div class="conflict-body">
+                当前目录已存在同名文件：
+                <span class="conflict-filename" id="conflictFileName"></span>
+            </div>
+            <div class="conflict-hint">保留两者时，新文件会自动重命名为「文件名 2」、「文件名 3」…</div>
+            <div class="conflict-buttons">
+                <button class="cancel-btn" onclick="handleConflictChoice('skip')">&#x23e9; 跳过</button>
+                <button class="secondary" onclick="handleConflictChoice('keep')">&#x2795; 保留两者</button>
+                <button class="delete-btn" onclick="handleConflictChoice('replace')">&#x21ba; 替换</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 上传进度模态框 -->
+    <div class="upload-modal" id="uploadModal">
+        <div class="upload-modal-content">
+            <div class="upload-modal-title">📤 正在上传文件...</div>
+            <div class="upload-file-count" id="uploadCount"></div>
+            <div class="upload-file-name" id="uploadFileName"></div>
+            <div class="progress-bar-container">
+                <div class="progress-bar-fill" id="progressBarFill"></div>
+            </div>
+            <div class="progress-percentage" id="progressPercentage">0%</div>
+        </div>
+    </div>
+
+    <!-- Toast 通知 -->
+    <div class="toast" id="toast"></div>
+
     <!-- 右键菜单 -->
     <div class="context-menu" id="contextMenu">
         <div class="context-menu-item" onclick="contextCreateFolder()">
@@ -891,6 +1312,8 @@
         let contextMenuName = ''; // 右键菜单选中的名称
         let createFolderTargetPath = null; // 创建文件夹的目标路径，null表示未设置
         let pendingDeleteAction = null; // 待执行的删除操作
+        let sortState = { key: 'name', dir: 'asc' }; // 排序状态
+        let lastFileData = null; // 缓存最后一次加载的数据
         
         // 显示确认对话框
         function showConfirmDialog(title, itemName, itemType, path, onConfirm) {
@@ -985,6 +1408,12 @@
                         actionClass = 'create';
                     } else if (log.action === '重命名文件夹') {
                         actionClass = 'rename';
+                    } else if (log.action === '还原文件') {
+                        actionClass = 'restore';
+                    } else if (log.action === '彻底删除') {
+                        actionClass = 'purge';
+                    } else if (log.action === '清空回收站') {
+                        actionClass = 'clear-trash';
                     }
                     
                     html += `
@@ -1022,6 +1451,153 @@
         function closeHelp() {
             document.getElementById('helpModal').classList.remove('active');
         }
+
+        // 显示回收站
+        async function showTrash() {
+            document.getElementById('trashModal').classList.add('active');
+            await loadTrash();
+        }
+
+        // 关闭回收站
+        function closeTrash() {
+            document.getElementById('trashModal').classList.remove('active');
+        }
+
+        // 加载回收站内容
+        async function loadTrash() {
+            const body = document.getElementById('trashBody');
+            body.innerHTML = '<div class="log-empty">加载中...</div>';
+            try {
+                const res = await fetch('/api/trash');
+                const items = await res.json();
+
+                const clearBtn = document.getElementById('clearTrashBtn');
+                clearBtn.style.display = items.length ? 'inline-block' : 'none';
+
+                if (items.length === 0) {
+                    body.innerHTML = '<div class="log-empty">🎉 回收站是空的</div>';
+                    return;
+                }
+
+                let html = '';
+                items.forEach(item => {
+                    const icon = item.isFolder ? '📁' : '📄';
+                    const size = item.isFolder ? '—' : formatFileSize(item.size);
+                    const deletedAt = new Date(item.deletedAt).toLocaleString('zh-CN');
+                    const originalDir = item.originalPath.includes('/')
+                        ? '根目录 / ' + item.originalPath.split('/').slice(0, -1).join(' / ')
+                        : '根目录';
+                    const safeName = item.originalName.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    html += `
+                        <div class="trash-item" id="trash-${item.id}">
+                            <div class="trash-item-icon">${icon}</div>
+                            <div class="trash-item-info">
+                                <div class="trash-item-name">${safeName}</div>
+                                <div class="trash-item-path">原目录：${originalDir}</div>
+                                <div class="trash-item-meta">${size} &nbsp;·&nbsp; 删除于 ${deletedAt}</div>
+                            </div>
+                            <div class="trash-item-actions">
+                                <button class="restore-btn" onclick="restoreTrashItem('${item.id}')">&#x21a9; 还原</button>
+                                <button class="delete-btn" onclick="permaDeleteTrashItem('${item.id}')">&#x1f5d1; 彻底删除</button>
+                            </div>
+                        </div>
+                    `;
+                });
+                body.innerHTML = html;
+            } catch (e) {
+                body.innerHTML = '<div class="log-empty">加载失败</div>';
+            }
+        }
+
+        // 还原文件
+        async function restoreTrashItem(id) {
+            try {
+                const res = await fetch('/api/trash/restore', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    showToast('✅ 还原成功', 'success');
+                    await loadTrash();
+                    loadTree();
+                    loadFiles();
+                } else {
+                    showToast(data.error || '还原失败', 'error');
+                }
+            } catch (e) {
+                showToast('还原失败', 'error');
+            }
+        }
+
+        // 简易自定义确认对话框
+        let _simpleConfirmCallback = null;
+
+        function showSimpleConfirm(title, body, warnText, okLabel, onConfirm) {
+            document.getElementById('simpleConfirmTitle').textContent = title;
+            document.getElementById('simpleConfirmBody').textContent = body;
+            document.getElementById('simpleConfirmWarn').textContent = warnText;
+            document.getElementById('simpleConfirmOkBtn').textContent = okLabel;
+            _simpleConfirmCallback = onConfirm;
+            document.getElementById('simpleConfirmDialog').classList.add('active');
+        }
+
+        function closeSimpleConfirm() {
+            document.getElementById('simpleConfirmDialog').classList.remove('active');
+            _simpleConfirmCallback = null;
+        }
+
+        function doSimpleConfirm() {
+            const cb = _simpleConfirmCallback;
+            closeSimpleConfirm();
+            if (cb) cb();
+        }
+
+        // 彻底删除
+        async function permaDeleteTrashItem(id) {
+            showSimpleConfirm(
+                '彻底删除',
+                '该文件将被永久删除，无法还原。',
+                '彻底删除后无法找回！',
+                '删除',
+                async () => {
+                    try {
+                        const res = await fetch(`/api/trash/delete?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+                        const data = await res.json();
+                        if (res.ok) {
+                            showToast('🗑️ 已彻底删除', 'danger');
+                            await loadTrash();
+                        } else {
+                            showToast(data.error || '删除失败', 'error');
+                        }
+                    } catch (e) {
+                        showToast('删除失败', 'error');
+                    }
+                }
+            );
+        }
+
+        // 清空回收站
+        async function clearTrash() {
+            showSimpleConfirm(
+                '清空回收站',
+                '回收站中所有文件和文件夹将被彻底删除。',
+                '清空后无法找回！',
+                '清空',
+                async () => {
+                    try {
+                        const res = await fetch('/api/trash/clear', { method: 'DELETE' });
+                        if (res.ok) {
+                            showToast('🗑️ 回收站已清空', 'danger');
+                            await loadTrash();
+                        }
+                    } catch (e) {
+                        showToast('清空失败', 'error');
+                    }
+                }
+            );
+        }
         
         // 页面加载时获取文件列表和目录树
         window.addEventListener('DOMContentLoaded', () => {
@@ -1030,10 +1606,16 @@
         });
         
         // 加载目录树
+        let treeInitialized = false;
+
         async function loadTree() {
             try {
                 const response = await fetch('/api/tree');
                 treeData = await response.json();
+                if (!treeInitialized) {
+                    expandAllRoot(); // 首次加载默认全部展开
+                    treeInitialized = true;
+                }
                 renderTree();
             } catch (error) {
                 console.error('加载目录树失败:', error);
@@ -1340,6 +1922,7 @@
                     });
                     
                     if (response.ok) {
+                        showToast(`🗑️ 文件夹 "${folderName}" 已删除`, 'danger');
                         // 先重新加载树数据
                         await loadTree();
                         
@@ -1357,21 +1940,46 @@
                         }
                     } else {
                         const data = await response.json();
-                        alert(data.error || '删除失败');
+                        showToast(data.error || '删除失败', 'error');
                     }
                 } catch (error) {
                     console.error('删除失败:', error);
-                    alert('删除失败');
+                    showToast('删除失败，请重试', 'error');
                 }
             });
         }
         
+        // 设置排序列
+        function setSortKey(key) {
+            if (sortState.key === key) {
+                sortState.dir = sortState.dir === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortState.key = key;
+                sortState.dir = key === 'date' ? 'desc' : 'asc';
+            }
+            updateSortHeader();
+            if (lastFileData) displayFiles(lastFileData);
+        }
+
+        // 更新表头高亮和箭头
+        function updateSortHeader() {
+            const keys = ['name', 'type', 'size', 'date'];
+            keys.forEach(k => {
+                const col = document.getElementById('sort' + k.charAt(0).toUpperCase() + k.slice(1));
+                const arrow = document.getElementById('arrow' + k.charAt(0).toUpperCase() + k.slice(1));
+                if (!col) return;
+                col.classList.toggle('active', sortState.key === k);
+                arrow.textContent = sortState.dir === 'asc' ? '↑' : '↓';
+                arrow.style.opacity = sortState.key === k ? '1' : '0.3';
+            });
+        }
+
         // 加载文件列表
         async function loadFiles() {
             try {
                 const response = await fetch(`/api/files?path=${encodeURIComponent(currentPath)}`);
                 const data = await response.json();
-                
+                lastFileData = data;
                 displayFiles(data);
                 updateBreadcrumb();
                 updateBackButton();
@@ -1389,43 +1997,83 @@
                 fileList.innerHTML = '<div class="empty">当前文件夹为空</div>';
                 return;
             }
+
+            // 排序文件夹
+            const folders = [...data.folders].sort((a, b) => {
+                let va, vb;
+                if (sortState.key === 'name' || sortState.key === 'type') {
+                    va = a.name.toLowerCase();
+                    vb = b.name.toLowerCase();
+                } else {
+                    return 0; // 文件夹按name fallback
+                }
+                const cmp = va < vb ? -1 : va > vb ? 1 : 0;
+                return sortState.dir === 'asc' ? cmp : -cmp;
+            });
+
+            // 排序文件
+            const files = [...data.files].sort((a, b) => {
+                let va, vb;
+                if (sortState.key === 'name') {
+                    va = a.name.toLowerCase();
+                    vb = b.name.toLowerCase();
+                } else if (sortState.key === 'type') {
+                    const extA = a.name.includes('.') ? a.name.split('.').pop().toLowerCase() : '';
+                    const extB = b.name.includes('.') ? b.name.split('.').pop().toLowerCase() : '';
+                    va = extA; vb = extB;
+                } else if (sortState.key === 'size') {
+                    va = a.size; vb = b.size;
+                } else if (sortState.key === 'date') {
+                    va = new Date(a.modified).getTime();
+                    vb = new Date(b.modified).getTime();
+                }
+                const cmp = va < vb ? -1 : va > vb ? 1 : 0;
+                return sortState.dir === 'asc' ? cmp : -cmp;
+            });
             
             let html = '';
             
             // 显示文件夹
-            data.folders.forEach(folder => {
-                // 根据是否为空显示不同图标和颜色
+            folders.forEach(folder => {
                 const folderIcon = folder.isEmpty ? '📂' : '📁';
                 const iconClass = folder.isEmpty ? '' : 'has-content';
-                
+                const safeName = folder.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const displayName = folder.name.replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 html += `
                     <div class="item folder">
-                        <div class="item-icon ${iconClass}">${folderIcon}</div>
-                        <div class="item-info">
-                            <div class="item-name" onclick="openFolder('${folder.name}')">${folder.name}</div>
-                            <div class="item-meta">文件夹</div>
+                        <div class="item-icon col-icon ${iconClass}">${folderIcon}</div>
+                        <div class="col-name" style="min-width:0">
+                            <div class="item-name" onclick="openFolder('${safeName}')">${displayName}</div>
                         </div>
-                        <div class="item-actions">
-                            <button class="delete-btn" onclick="deleteItem('${folder.name}', true)">删除</button>
+                        <div class="item-type col-type">文件夹</div>
+                        <div class="item-size col-size">—</div>
+                        <div class="item-date col-date">—</div>
+                        <div class="item-actions col-actions">
+                            <button class="delete-btn" onclick="deleteItem('${safeName}', true)">删除</button>
                         </div>
                     </div>
                 `;
             });
             
             // 显示文件
-            data.files.forEach(file => {
+            files.forEach(file => {
                 const size = formatFileSize(file.size);
                 const date = new Date(file.modified).toLocaleString('zh-CN');
+                const ext = file.name.includes('.') ? file.name.split('.').pop().toUpperCase() : '文件';
+                const safeName = file.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const displayName = file.name.replace(/</g, '&lt;').replace(/>/g, '&gt;');
                 html += `
                     <div class="item">
-                        <div class="item-icon">📄</div>
-                        <div class="item-info">
-                            <div class="item-name">${file.name}</div>
-                            <div class="item-meta">${size} · ${date}</div>
+                        <div class="item-icon col-icon">📄</div>
+                        <div class="col-name" style="min-width:0">
+                            <div class="item-name">${displayName}</div>
                         </div>
-                        <div class="item-actions">
-                            <button class="secondary" onclick="downloadFile('${file.name}')">下载</button>
-                            <button class="delete-btn" onclick="deleteItem('${file.name}', false)">删除</button>
+                        <div class="item-type col-type">${ext}</div>
+                        <div class="item-size col-size">${size}</div>
+                        <div class="item-date col-date">${date}</div>
+                        <div class="item-actions col-actions">
+                            <button class="secondary" onclick="downloadFile('${safeName}')">下载</button>
+                            <button class="delete-btn" onclick="deleteItem('${safeName}', false)">删除</button>
                         </div>
                     </div>
                 `;
@@ -1498,36 +2146,142 @@
             document.getElementById('fileInput').click();
         }
         
+        // 显示 Toast 通知
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast ${type}`;
+            // 触发重绘以确保过渡动画生效
+            toast.offsetHeight;
+            toast.classList.add('show');
+            clearTimeout(toast._timer);
+            toast._timer = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3500);
+        }
+
+        // 冲突对话框 Promise 控制
+        let _resolveConflict = null;
+
+        function showConflictDialog(fileName) {
+            return new Promise(resolve => {
+                _resolveConflict = resolve;
+                document.getElementById('conflictFileName').textContent = fileName;
+                document.getElementById('conflictDialog').classList.add('active');
+            });
+        }
+
+        function handleConflictChoice(choice) {
+            document.getElementById('conflictDialog').classList.remove('active');
+            if (_resolveConflict) {
+                _resolveConflict(choice);
+                _resolveConflict = null;
+            }
+        }
+
         // 上传文件
         async function uploadFile() {
             const input = document.getElementById('fileInput');
-            const files = input.files;
+            const files = Array.from(input.files);
             
             if (files.length === 0) return;
+
+            // 第一步：冲突检测，决定每个文件的处理方式
+            const tasks = []; // { file, mode }
+            for (const file of files) {
+                try {
+                    const res = await fetch(`/api/check-file?path=${encodeURIComponent(currentPath)}&name=${encodeURIComponent(file.name)}`);
+                    if (!res.ok) throw new Error('check-file 请求失败');
+                    const { exists } = await res.json();
+                    if (exists) {
+                        const choice = await showConflictDialog(file.name);
+                        if (choice === 'skip') continue;
+                        tasks.push({ file, mode: choice }); // 'replace' | 'keep'
+                    } else {
+                        tasks.push({ file, mode: 'replace' });
+                    }
+                } catch (e) {
+                    tasks.push({ file, mode: 'replace' });
+                }
+            }
+
+            if (tasks.length === 0) {
+                input.value = '';
+                return;
+            }
+
+            // 第二步：显示进度窗口，逐个上传
+            const uploadModal    = document.getElementById('uploadModal');
+            const uploadFileName = document.getElementById('uploadFileName');
+            const uploadCount    = document.getElementById('uploadCount');
+            const progressFill   = document.getElementById('progressBarFill');
+            const progressPct    = document.getElementById('progressPercentage');
             
-            for (let i = 0; i < files.length; i++) {
-                const formData = new FormData();
-                formData.append('file', files[i]);
+            uploadModal.classList.add('active');
+            
+            let successCount = 0;
+            let failedNames  = [];
+            
+            for (let i = 0; i < tasks.length; i++) {
+                const { file, mode } = tasks[i];
+                uploadCount.textContent    = `第 ${i + 1} / ${tasks.length} 个文件`;
+                uploadFileName.textContent = file.name;
+                progressFill.style.width   = '0%';
+                progressPct.textContent    = '0%';
                 
                 try {
-                    // 将路径作为URL参数传递
-                    const response = await fetch(`/api/upload?path=${encodeURIComponent(currentPath)}`, {
-                        method: 'POST',
-                        body: formData
+                    await new Promise((resolve, reject) => {
+                        const xhr = new XMLHttpRequest();
+                        const formData = new FormData();
+                        formData.append('file', file);
+                        
+                        xhr.upload.addEventListener('progress', (e) => {
+                            if (e.lengthComputable) {
+                                const pct = Math.round(e.loaded / e.total * 100);
+                                progressFill.style.width = pct + '%';
+                                progressPct.textContent  = pct + '%';
+                            }
+                        });
+                        
+                        xhr.addEventListener('load', () => {
+                            if (xhr.status >= 200 && xhr.status < 300) {
+                                progressFill.style.width = '100%';
+                                progressPct.textContent  = '100%';
+                                successCount++;
+                                resolve();
+                            } else {
+                                failedNames.push(file.name);
+                                reject(new Error(file.name + ' 上传失败'));
+                            }
+                        });
+                        
+                        xhr.addEventListener('error', () => {
+                            failedNames.push(file.name);
+                            reject(new Error(file.name + ' 上传失败'));
+                        });
+                        
+                        xhr.open('POST', `/api/upload?path=${encodeURIComponent(currentPath)}&mode=${mode}`);
+                        xhr.send(formData);
                     });
-                    
-                    if (response.ok) {
-                        console.log(`${files[i].name} 上传成功`);
-                    } else {
-                        alert(`${files[i].name} 上传失败`);
-                    }
                 } catch (error) {
                     console.error('上传失败:', error);
-                    alert(`${files[i].name} 上传失败`);
                 }
             }
             
             input.value = '';
+            uploadModal.classList.remove('active');
+            
+            if (successCount > 0 && failedNames.length === 0) {
+                const msg = tasks.length === 1
+                    ? `✅ "${tasks[0].file.name}" 上传成功！`
+                    : `✅ ${successCount} 个文件全部上传成功！`;
+                showToast(msg, 'success');
+            } else if (successCount > 0 && failedNames.length > 0) {
+                showToast(`⚠️ ${successCount} 个成功，${failedNames.length} 个失败`, 'error');
+            } else {
+                showToast('❌ 上传失败，请重试', 'error');
+            }
+            
             loadTree();
             loadFiles();
         }
@@ -1685,15 +2439,17 @@
                     });
                     
                     if (response.ok) {
+                        const icon = isFolder ? '🗑️' : '✅';
+                        showToast(`${icon} ${itemType} "${name}" 已删除`, 'danger');
                         loadTree();
                         loadFiles();
                     } else {
                         const data = await response.json();
-                        alert(data.error || '删除失败');
+                        showToast(data.error || '删除失败', 'error');
                     }
                 } catch (error) {
                     console.error('删除失败:', error);
-                    alert('删除失败');
+                    showToast('删除失败，请重试', 'error');
                 }
             });
         }
@@ -1755,6 +2511,20 @@
         document.getElementById('helpModal').addEventListener('click', (e) => {
             if (e.target.id === 'helpModal') {
                 closeHelp();
+            }
+        });
+
+        // 点击回收站模态框外部关闭
+        document.getElementById('trashModal').addEventListener('click', (e) => {
+            if (e.target.id === 'trashModal') {
+                closeTrash();
+            }
+        });
+
+        // 点击简易确认框外部关闭
+        document.getElementById('simpleConfirmDialog').addEventListener('click', (e) => {
+            if (e.target.id === 'simpleConfirmDialog') {
+                closeSimpleConfirm();
             }
         });
         
