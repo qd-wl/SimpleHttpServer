@@ -177,6 +177,63 @@
             gap: 10px;
             flex-wrap: wrap;
         }
+
+        .utility-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 0 20px 15px;
+            flex-wrap: wrap;
+        }
+
+        .search-controls {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+
+        .search-input,
+        .search-select {
+            height: 38px;
+            padding: 0 12px;
+            border: 1px solid #d7d7d7;
+            border-radius: 6px;
+            font-size: 14px;
+            background: white;
+        }
+
+        .search-input {
+            min-width: 260px;
+        }
+
+        .search-select {
+            appearance: none;
+            -webkit-appearance: none;
+            padding-right: 44px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' fill='none' stroke='%23333' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 14px center;
+            background-size: 12px 8px;
+        }
+
+        .stats-bar {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+            font-size: 13px;
+            color: #555;
+        }
+
+        .stats-chip {
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: #eef4ff;
+            color: #355c7d;
+            border: 1px solid #d9e7ff;
+        }
         
         button {
             padding: 8px 16px;
@@ -317,13 +374,32 @@
             display: flex;
             gap: 6px;
             justify-content: flex-end;
+            flex-wrap: wrap;
+        }
+
+        .item-subpath {
+            margin-top: 4px;
+            font-size: 12px;
+            color: #777;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .item-subpath.link {
+            cursor: pointer;
+            color: #2196F3;
+        }
+
+        .item-subpath.link:hover {
+            text-decoration: underline;
         }
         
         .item-actions button {
             padding: 5px 10px;
             font-size: 12px;
         }
-        
+
         .delete-btn {
             background: #f44336;
         }
@@ -393,7 +469,7 @@
             font-size: 14px;
             margin-bottom: 16px;
         }
-        
+
         .modal-buttons {
             display: flex;
             gap: 10px;
@@ -1053,6 +1129,21 @@
                 <button class="secondary" onclick="goBack()" id="backBtn" style="display: none;">⬅️ 返回上级</button>
                 <button class="secondary" onclick="refreshAll()">🔄 刷新</button>
             </div>
+
+            <div class="utility-bar">
+                <div class="search-controls">
+                    <input type="text" id="searchInput" class="search-input" placeholder="搜索文件或文件夹名称">
+                    <select id="searchScope" class="search-select">
+                        <option value="current">当前目录</option>
+                        <option value="all">全部目录</option>
+                    </select>
+                    <button class="secondary" onclick="performSearch()">🔍 搜索</button>
+                    <button class="secondary" onclick="clearSearch()">✖ 清除</button>
+                </div>
+                <div class="stats-bar" id="statsBar">
+                    <span class="stats-chip">空间信息加载中...</span>
+                </div>
+            </div>
             
             <div class="content-area">
                 <!-- 排序表头 -->
@@ -1241,7 +1332,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- 冲突处理对话框 -->
     <div class="conflict-dialog" id="conflictDialog">
         <div class="conflict-content">
@@ -1314,6 +1405,7 @@
         let pendingDeleteAction = null; // 待执行的删除操作
         let sortState = { key: 'name', dir: 'asc' }; // 排序状态
         let lastFileData = null; // 缓存最后一次加载的数据
+        let searchState = { active: false, keyword: '', scope: 'current' };
         
         // 显示确认对话框
         function showConfirmDialog(title, itemName, itemType, path, onConfirm) {
@@ -1337,14 +1429,16 @@
                 </div>
             `;
             
-            if (isFolder) {
-                html += `
-                    <div class="confirm-warning">
-                        <span class="confirm-warning-icon">⚠️</span>
-                        <span class="confirm-warning-text">此操作将删除该文件夹及其所有内容，且无法恢复！</span>
-                    </div>
-                `;
-            }
+            const warningText = isFolder
+                ? '此操作将把该文件夹及其所有内容移入回收站，你仍可在回收站中还原。'
+                : '此操作将把该文件移入回收站，你仍可在回收站中还原。';
+
+            html += `
+                <div class="confirm-warning">
+                    <span class="confirm-warning-icon">⚠️</span>
+                    <span class="confirm-warning-text">${warningText}</span>
+                </div>
+            `;
             
             bodyEl.innerHTML = html;
             pendingDeleteAction = onConfirm;
@@ -1363,6 +1457,260 @@
                 pendingDeleteAction();
             }
             closeConfirmDialog();
+        }
+
+        function escapeHtml(value) {
+            return String(value)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function escapeJsString(value) {
+            return String(value)
+                .replace(/\\/g, '\\\\')
+                .replace(/'/g, "\\'");
+        }
+
+        function formatPathLabel(targetPath) {
+            return targetPath ? `根目录 / ${targetPath}` : '根目录';
+        }
+
+        function getParentPath(targetPath) {
+            if (!targetPath || !targetPath.includes('/')) {
+                return '';
+            }
+
+            return targetPath.split('/').slice(0, -1).join('/');
+        }
+
+        function sortFoldersAndFiles(folders, files) {
+            const sortedFolders = [...folders].sort((a, b) => {
+                const valueA = a.name.toLowerCase();
+                const valueB = b.name.toLowerCase();
+                const cmp = valueA < valueB ? -1 : valueA > valueB ? 1 : 0;
+                return sortState.dir === 'asc' ? cmp : -cmp;
+            });
+
+            const sortedFiles = [...files].sort((a, b) => {
+                let valueA;
+                let valueB;
+
+                if (sortState.key === 'name') {
+                    valueA = a.name.toLowerCase();
+                    valueB = b.name.toLowerCase();
+                } else if (sortState.key === 'type') {
+                    valueA = (a.typeLabel || a.name.split('.').pop() || '').toLowerCase();
+                    valueB = (b.typeLabel || b.name.split('.').pop() || '').toLowerCase();
+                } else if (sortState.key === 'size') {
+                    valueA = a.size || 0;
+                    valueB = b.size || 0;
+                } else {
+                    valueA = new Date(a.modified).getTime();
+                    valueB = new Date(b.modified).getTime();
+                }
+
+                const cmp = valueA < valueB ? -1 : valueA > valueB ? 1 : 0;
+                return sortState.dir === 'asc' ? cmp : -cmp;
+            });
+
+            return { folders: sortedFolders, files: sortedFiles };
+        }
+
+        function renderFolderRow(folder, itemPath, subpath = '', subpathTarget = '', extraActions = '') {
+            const safeName = escapeHtml(folder.name);
+            const safeItemPath = escapeJsString(itemPath);
+            const safeSubpath = escapeHtml(subpath);
+            const safeSubpathTarget = escapeJsString(subpathTarget);
+            const folderIcon = folder.isEmpty ? '📂' : '📁';
+            const iconClass = folder.isEmpty ? '' : 'has-content';
+
+            return `
+                <div class="item folder">
+                    <div class="item-icon col-icon ${iconClass}">${folderIcon}</div>
+                    <div class="col-name" style="min-width:0">
+                        <div class="item-name" onclick="navigateTo('${safeItemPath}')">${safeName}</div>
+                        ${safeSubpath ? `<div class="item-subpath ${subpathTarget ? 'link' : ''}" ${subpathTarget ? `onclick="navigateTo('${safeSubpathTarget}')"` : ''}>${safeSubpath}</div>` : ''}
+                    </div>
+                    <div class="item-type col-type">文件夹</div>
+                    <div class="item-size col-size">—</div>
+                    <div class="item-date col-date">—</div>
+                    <div class="item-actions col-actions">
+                        ${extraActions}
+                        <button class="delete-btn" onclick="deleteByPath('${safeItemPath}', true, '${escapeJsString(folder.name)}')">删除</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderFileRow(file, itemPath, subpath = '', subpathTarget = '', extraActions = '') {
+            const safeName = escapeHtml(file.name);
+            const safeItemPath = escapeJsString(itemPath);
+            const safeSubpath = escapeHtml(subpath);
+            const safeSubpathTarget = escapeJsString(subpathTarget);
+            const size = formatFileSize(file.size || 0);
+            const date = new Date(file.modified).toLocaleString('zh-CN');
+            const ext = file.typeLabel || (file.name.includes('.') ? file.name.split('.').pop().toUpperCase() : '文件');
+
+            return `
+                <div class="item">
+                    <div class="item-icon col-icon">📄</div>
+                    <div class="col-name" style="min-width:0">
+                        <div class="item-name">${safeName}</div>
+                        ${safeSubpath ? `<div class="item-subpath ${subpathTarget ? 'link' : ''}" ${subpathTarget ? `onclick="navigateTo('${safeSubpathTarget}')"` : ''}>${safeSubpath}</div>` : ''}
+                    </div>
+                    <div class="item-type col-type">${escapeHtml(ext)}</div>
+                    <div class="item-size col-size">${size}</div>
+                    <div class="item-date col-date">${date}</div>
+                    <div class="item-actions col-actions">
+                        ${extraActions}
+                        <button class="secondary" onclick="downloadByPath('${safeItemPath}')">下载</button>
+                        <button class="delete-btn" onclick="deleteByPath('${safeItemPath}', false, '${escapeJsString(file.name)}')">删除</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function loadSpaceInfo() {
+            const statsBar = document.getElementById('statsBar');
+            statsBar.innerHTML = '<span class="stats-chip">空间信息加载中...</span>';
+
+            try {
+                const response = await fetch(`/api/space?path=${encodeURIComponent(currentPath)}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || '获取空间信息失败');
+                }
+
+                statsBar.innerHTML = `
+                    <span class="stats-chip">当前目录 ${data.directFolderCount} 个文件夹</span>
+                    <span class="stats-chip">当前目录 ${data.directFileCount} 个文件</span>
+                    <span class="stats-chip">目录总占用 ${formatFileSize(data.totalSize)}</span>
+                    <span class="stats-chip">磁盘可用 ${formatFileSize(data.freeSpace)}</span>
+                `;
+            } catch (error) {
+                statsBar.innerHTML = '<span class="stats-chip">空间信息加载失败</span>';
+            }
+        }
+
+        function exitSearchMode() {
+            searchState.active = false;
+        }
+
+        async function performSearch(preserveState = false) {
+            const input = document.getElementById('searchInput');
+            const scopeSelect = document.getElementById('searchScope');
+            const keyword = preserveState ? searchState.keyword : input.value.trim();
+            const scope = preserveState ? searchState.scope : scopeSelect.value;
+            const fileList = document.getElementById('fileList');
+
+            if (!keyword) {
+                clearSearch();
+                return;
+            }
+
+            searchState = { active: true, keyword, scope };
+            input.value = keyword;
+            scopeSelect.value = scope;
+            fileList.innerHTML = '<div class="loading">搜索中...</div>';
+
+            try {
+                const response = await fetch(`/api/search?keyword=${encodeURIComponent(keyword)}&path=${encodeURIComponent(currentPath)}&scope=${encodeURIComponent(scope)}`);
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || '搜索失败');
+                }
+
+                renderSearchResults(data.results);
+                await loadSpaceInfo();
+            } catch (error) {
+                console.error('搜索失败:', error);
+                fileList.innerHTML = `<div class="empty">${escapeHtml(error.message || '搜索失败')}</div>`;
+            }
+        }
+
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            searchState = { active: false, keyword: '', scope: document.getElementById('searchScope').value };
+            loadFiles();
+        }
+
+        function renderSearchResults(results) {
+            const fileList = document.getElementById('fileList');
+
+            if (!results.length) {
+                fileList.innerHTML = '<div class="empty">没有找到匹配项</div>';
+                return;
+            }
+
+            const folders = results.filter(item => item.type === 'folder').map(item => ({
+                ...item,
+                isEmpty: false
+            }));
+            const files = results.filter(item => item.type === 'file').map(item => ({
+                ...item,
+                typeLabel: item.name.includes('.') ? item.name.split('.').pop().toUpperCase() : '文件'
+            }));
+            const sorted = sortFoldersAndFiles(folders, files);
+
+            let html = `<div class="empty" style="padding:12px 20px;text-align:left;color:#666;">搜索到 ${results.length} 个结果</div>`;
+            sorted.folders.forEach(folder => {
+                html += renderFolderRow(
+                    folder,
+                    folder.path,
+                    formatPathLabel(folder.path),
+                    folder.path
+                );
+            });
+            sorted.files.forEach(file => {
+                html += renderFileRow(
+                    file,
+                    file.path,
+                    formatPathLabel(file.parentPath),
+                    file.parentPath
+                );
+            });
+
+            fileList.innerHTML = html;
+        }
+
+        async function refreshCurrentView() {
+            if (searchState.active) {
+                await performSearch(true);
+            } else {
+                await loadFiles();
+            }
+        }
+
+        async function deleteByPath(itemPath, isFolder, displayName) {
+            const itemType = isFolder ? '文件夹' : '文件';
+            showConfirmDialog(`确定要删除这个${itemType}吗？`, displayName, itemType, getParentPath(itemPath), async () => {
+                try {
+                    const response = await fetch(`/api/delete?path=${encodeURIComponent(itemPath)}`, {
+                        method: 'DELETE'
+                    });
+
+                    if (response.ok) {
+                        showToast(`${itemType} \"${displayName}\" 已删除`, 'danger');
+                        await loadTree();
+                        await refreshCurrentView();
+                    } else {
+                        const data = await response.json();
+                        showToast(data.error || '删除失败', 'error');
+                    }
+                } catch (error) {
+                    console.error('删除失败:', error);
+                    showToast('删除失败，请重试', 'error');
+                }
+            });
+        }
+
+        function downloadByPath(filePath) {
+            window.location.href = `/api/download?path=${encodeURIComponent(filePath)}`;
         }
         
         // 显示日志
@@ -1521,8 +1869,8 @@
                 if (res.ok) {
                     showToast('✅ 还原成功', 'success');
                     await loadTrash();
-                    loadTree();
-                    loadFiles();
+                    await loadTree();
+                    await refreshCurrentView();
                 } else {
                     showToast(data.error || '还原失败', 'error');
                 }
@@ -1936,7 +2284,7 @@
                                 expandedFolders.add(parentPath);
                             }
                             renderTree();
-                            await loadFiles();
+                            await refreshCurrentView();
                         }
                     } else {
                         const data = await response.json();
@@ -1958,7 +2306,11 @@
                 sortState.dir = key === 'date' ? 'desc' : 'asc';
             }
             updateSortHeader();
-            if (lastFileData) displayFiles(lastFileData);
+            if (searchState.active) {
+                performSearch(true);
+            } else if (lastFileData) {
+                displayFiles(lastFileData);
+            }
         }
 
         // 更新表头高亮和箭头
@@ -1983,6 +2335,7 @@
                 displayFiles(data);
                 updateBreadcrumb();
                 updateBackButton();
+                await loadSpaceInfo();
             } catch (error) {
                 console.error('加载文件列表失败:', error);
                 document.getElementById('fileList').innerHTML = '<div class="empty">加载失败</div>';
@@ -1998,85 +2351,18 @@
                 return;
             }
 
-            // 排序文件夹
-            const folders = [...data.folders].sort((a, b) => {
-                let va, vb;
-                if (sortState.key === 'name' || sortState.key === 'type') {
-                    va = a.name.toLowerCase();
-                    vb = b.name.toLowerCase();
-                } else {
-                    return 0; // 文件夹按name fallback
-                }
-                const cmp = va < vb ? -1 : va > vb ? 1 : 0;
-                return sortState.dir === 'asc' ? cmp : -cmp;
-            });
-
-            // 排序文件
-            const files = [...data.files].sort((a, b) => {
-                let va, vb;
-                if (sortState.key === 'name') {
-                    va = a.name.toLowerCase();
-                    vb = b.name.toLowerCase();
-                } else if (sortState.key === 'type') {
-                    const extA = a.name.includes('.') ? a.name.split('.').pop().toLowerCase() : '';
-                    const extB = b.name.includes('.') ? b.name.split('.').pop().toLowerCase() : '';
-                    va = extA; vb = extB;
-                } else if (sortState.key === 'size') {
-                    va = a.size; vb = b.size;
-                } else if (sortState.key === 'date') {
-                    va = new Date(a.modified).getTime();
-                    vb = new Date(b.modified).getTime();
-                }
-                const cmp = va < vb ? -1 : va > vb ? 1 : 0;
-                return sortState.dir === 'asc' ? cmp : -cmp;
-            });
+            const sorted = sortFoldersAndFiles(data.folders, data.files);
             
             let html = '';
             
-            // 显示文件夹
-            folders.forEach(folder => {
-                const folderIcon = folder.isEmpty ? '📂' : '📁';
-                const iconClass = folder.isEmpty ? '' : 'has-content';
-                const safeName = folder.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                const displayName = folder.name.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                html += `
-                    <div class="item folder">
-                        <div class="item-icon col-icon ${iconClass}">${folderIcon}</div>
-                        <div class="col-name" style="min-width:0">
-                            <div class="item-name" onclick="openFolder('${safeName}')">${displayName}</div>
-                        </div>
-                        <div class="item-type col-type">文件夹</div>
-                        <div class="item-size col-size">—</div>
-                        <div class="item-date col-date">—</div>
-                        <div class="item-actions col-actions">
-                            <button class="delete-btn" onclick="deleteItem('${safeName}', true)">删除</button>
-                        </div>
-                    </div>
-                `;
+            sorted.folders.forEach(folder => {
+                const itemPath = currentPath ? `${currentPath}/${folder.name}` : folder.name;
+                html += renderFolderRow(folder, itemPath);
             });
-            
-            // 显示文件
-            files.forEach(file => {
-                const size = formatFileSize(file.size);
-                const date = new Date(file.modified).toLocaleString('zh-CN');
-                const ext = file.name.includes('.') ? file.name.split('.').pop().toUpperCase() : '文件';
-                const safeName = file.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
-                const displayName = file.name.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-                html += `
-                    <div class="item">
-                        <div class="item-icon col-icon">📄</div>
-                        <div class="col-name" style="min-width:0">
-                            <div class="item-name">${displayName}</div>
-                        </div>
-                        <div class="item-type col-type">${ext}</div>
-                        <div class="item-size col-size">${size}</div>
-                        <div class="item-date col-date">${date}</div>
-                        <div class="item-actions col-actions">
-                            <button class="secondary" onclick="downloadFile('${safeName}')">下载</button>
-                            <button class="delete-btn" onclick="deleteItem('${safeName}', false)">删除</button>
-                        </div>
-                    </div>
-                `;
+
+            sorted.files.forEach(file => {
+                const itemPath = currentPath ? `${currentPath}/${file.name}` : file.name;
+                html += renderFileRow(file, itemPath);
             });
             
             fileList.innerHTML = html;
@@ -2093,16 +2379,16 @@
         
         // 打开文件夹
         function openFolder(folderName) {
-            currentPath = currentPath ? `${currentPath}/${folderName}` : folderName;
-            loadFiles();
+            exitSearchMode();
+            navigateTo(currentPath ? `${currentPath}/${folderName}` : folderName);
         }
         
         // 返回上级目录
         function goBack() {
             const parts = currentPath.split('/');
             parts.pop();
-            currentPath = parts.join('/');
-            loadFiles();
+            exitSearchMode();
+            navigateTo(parts.join('/'));
         }
         
         // 更新面包屑导航
@@ -2128,6 +2414,7 @@
         
         // 导航到指定路径
         function navigateTo(path) {
+            exitSearchMode();
             currentPath = path;
             updateBreadcrumb();
             updateBackButton();
@@ -2282,8 +2569,8 @@
                 showToast('❌ 上传失败，请重试', 'error');
             }
             
-            loadTree();
-            loadFiles();
+            await loadTree();
+            await refreshCurrentView();
         }
         
         // 显示创建文件夹模态框
@@ -2337,8 +2624,8 @@
                         expandedFolders.add(targetPath);
                     }
                     closeModal();
-                    loadTree();
-                    loadFiles();
+                    await loadTree();
+                    await refreshCurrentView();
                 } else {
                     const data = await response.json();
                     alert(data.error || '创建失败');
@@ -2416,7 +2703,7 @@
                     }
                     
                     await loadTree();
-                    await loadFiles();
+                    await refreshCurrentView();
                 } else {
                     const data = await response.json();
                     alert(data.error || '重命名失败');
@@ -2441,8 +2728,8 @@
                     if (response.ok) {
                         const icon = isFolder ? '🗑️' : '✅';
                         showToast(`${icon} ${itemType} "${name}" 已删除`, 'danger');
-                        loadTree();
-                        loadFiles();
+                            await loadTree();
+                            await refreshCurrentView();
                     } else {
                         const data = await response.json();
                         showToast(data.error || '删除失败', 'error');
@@ -2456,14 +2743,20 @@
         
         // 刷新文件列表
         function refreshFiles() {
-            loadFiles();
+            refreshCurrentView();
         }
         
         // 刷新所有（目录树和文件列表）
         function refreshAll() {
             loadTree();
-            loadFiles();
+            refreshCurrentView();
         }
+
+        document.getElementById('searchInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                performSearch();
+            }
+        });
         
         // 按 Enter 键创建文件夹
         document.getElementById('folderNameInput').addEventListener('keypress', (e) => {
@@ -2492,7 +2785,7 @@
                 closeRenameModal();
             }
         });
-        
+
         // 点击确认对话框外部关闭
         document.getElementById('confirmDialog').addEventListener('click', (e) => {
             if (e.target.id === 'confirmDialog') {

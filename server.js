@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const multer = require('multer');
+const os = require('os');
 const path = require('path');
 const fs = require('fs');
 
@@ -112,6 +113,107 @@ function saveTrashMeta(meta) {
     fs.writeFileSync(TRASH_META, JSON.stringify(meta, null, 2), 'utf8');
 }
 
+function resolveUploadPath(relativePath = '') {
+    const normalized = path.normalize(relativePath || '').replace(/^([/\\])+/, '');
+    const fullPath = path.resolve(UPLOAD_DIR, normalized);
+
+    if (fullPath !== UPLOAD_DIR && !fullPath.startsWith(UPLOAD_DIR + path.sep)) {
+        throw new Error('无效路径');
+    }
+
+    const safeRelativePath = fullPath === UPLOAD_DIR
+        ? ''
+        : path.relative(UPLOAD_DIR, fullPath).split(path.sep).join('/');
+
+    return { fullPath, relativePath: safeRelativePath };
+}
+
+function validateItemName(name) {
+    if (!name || typeof name !== 'string') {
+        throw new Error('名称不能为空');
+    }
+
+    if (name.includes('/') || name.includes('\\')) {
+        throw new Error('名称不能包含路径分隔符');
+    }
+
+    return name.trim();
+}
+
+function getDisplayPath(relativePath = '') {
+    return relativePath ? `根目录 / ${relativePath}` : '根目录';
+}
+
+function getDirectoryStats(dirPath) {
+    const summary = {
+        directFileCount: 0,
+        directFolderCount: 0,
+        totalFileCount: 0,
+        totalFolderCount: 0,
+        totalSize: 0
+    };
+
+    if (!fs.existsSync(dirPath)) {
+        return summary;
+    }
+
+    const entries = fs.readdirSync(dirPath);
+
+    entries.forEach(entry => {
+        const entryPath = path.join(dirPath, entry);
+        const stat = fs.statSync(entryPath);
+
+        if (stat.isDirectory()) {
+            summary.directFolderCount++;
+            summary.totalFolderCount++;
+
+            const childSummary = getDirectoryStats(entryPath);
+            summary.totalFileCount += childSummary.totalFileCount;
+            summary.totalFolderCount += childSummary.totalFolderCount;
+            summary.totalSize += childSummary.totalSize;
+        } else {
+            summary.directFileCount++;
+            summary.totalFileCount++;
+            summary.totalSize += stat.size;
+        }
+    });
+
+    return summary;
+}
+
+function searchItems(baseDir, keyword, relativeBasePath = '', results = []) {
+    if (!fs.existsSync(baseDir)) {
+        return results;
+    }
+
+    const entries = fs.readdirSync(baseDir);
+    const needle = keyword.toLowerCase();
+
+    entries.forEach(entry => {
+        const fullPath = path.join(baseDir, entry);
+        const stat = fs.statSync(fullPath);
+        const relativePath = relativeBasePath ? `${relativeBasePath}/${entry}` : entry;
+
+        if (entry.toLowerCase().includes(needle)) {
+            results.push({
+                name: entry,
+                path: relativePath,
+                parentPath: relativeBasePath,
+                type: stat.isDirectory() ? 'folder' : 'file',
+                size: stat.isDirectory() ? 0 : stat.size,
+                modified: stat.mtime
+            });
+        }
+
+        if (stat.isDirectory()) {
+            searchItems(fullPath, keyword, relativePath, results);
+        }
+    });
+
+    return results;
+}
+
+
 // 启动时加载历史日志
 loadLogs();
 
@@ -123,33 +225,38 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 // 配置文件上传
 const storage = multer.diskStorage({
     destination: (req, file, cb) => {
-        const subPath = req.query.path || '';
-        const targetDir = path.join(UPLOAD_DIR, subPath);
-        
-        if (!fs.existsSync(targetDir)) {
-            fs.mkdirSync(targetDir, { recursive: true });
+        try {
+            const { fullPath: targetDir } = resolveUploadPath(req.query.path || '');
+            
+            if (!fs.existsSync(targetDir)) {
+                fs.mkdirSync(targetDir, { recursive: true });
+            }
+            cb(null, targetDir);
+        } catch (error) {
+            cb(error);
         }
-        cb(null, targetDir);
     },
     filename: (req, file, cb) => {
-        const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
-        const mode = req.query.mode || 'replace';
-        
-        if (mode === 'keep') {
-            const subPath = req.query.path || '';
-            const targetDir = path.join(UPLOAD_DIR, subPath);
-            const ext = path.extname(originalName);
-            const base = path.basename(originalName, ext);
-            let counter = 2;
-            let newName = originalName;
-            while (fs.existsSync(path.join(targetDir, newName))) {
-                newName = `${base} ${counter}${ext}`;
-                counter++;
+        try {
+            const originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+            const mode = req.query.mode || 'replace';
+            const { fullPath: targetDir } = resolveUploadPath(req.query.path || '');
+            
+            if (mode === 'keep') {
+                const ext = path.extname(originalName);
+                const base = path.basename(originalName, ext);
+                let counter = 2;
+                let newName = originalName;
+                while (fs.existsSync(path.join(targetDir, newName))) {
+                    newName = `${base} ${counter}${ext}`;
+                    counter++;
+                }
+                cb(null, newName);
+            } else {
+                cb(null, originalName);
             }
-            cb(null, newName);
-        } else {
-            // replace: 直接覆盖
-            cb(null, originalName);
+        } catch (error) {
+            cb(error);
         }
     }
 });
@@ -211,14 +318,13 @@ function buildTree(dirPath, relativePath) {
 
 // 获取文件列表
 app.get('/api/files', (req, res) => {
-    const subPath = req.query.path || '';
-    const targetDir = path.join(UPLOAD_DIR, subPath);
-    
-    if (!fs.existsSync(targetDir)) {
-        return res.json({ files: [], folders: [] });
-    }
-    
     try {
+        const { fullPath: targetDir } = resolveUploadPath(req.query.path || '');
+
+        if (!fs.existsSync(targetDir)) {
+            return res.json({ files: [], folders: [] });
+        }
+
         const items = fs.readdirSync(targetDir);
         const files = [];
         const folders = [];
@@ -255,11 +361,17 @@ app.get('/api/files', (req, res) => {
 
 // 检查文件是否存在
 app.get('/api/check-file', (req, res) => {
-    const subPath = req.query.path || '';
     const name = req.query.name;
     if (!name) return res.status(400).json({ error: '参数缺失' });
-    const fullPath = path.join(UPLOAD_DIR, subPath, name);
-    res.json({ exists: fs.existsSync(fullPath) });
+
+    try {
+        const safeName = validateItemName(name);
+        const { fullPath: targetDir } = resolveUploadPath(req.query.path || '');
+        const fullPath = path.join(targetDir, safeName);
+        res.json({ exists: fs.existsSync(fullPath) });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
 });
 
 // 上传文件
@@ -278,48 +390,111 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
 
 // 创建文件夹
 app.post('/api/mkdir', (req, res) => {
-    const { path: subPath, name } = req.body;
-    const targetDir = path.join(UPLOAD_DIR, subPath || '', name);
-    
     try {
+        const { path: subPath, name } = req.body;
+        const safeName = validateItemName(name);
+        const { fullPath: parentDir, relativePath: parentRelativePath } = resolveUploadPath(subPath || '');
+        const targetDir = path.join(parentDir, safeName);
+
         if (fs.existsSync(targetDir)) {
             return res.status(400).json({ error: '文件夹已存在' });
         }
         fs.mkdirSync(targetDir, { recursive: true });
-        const fullPath = subPath ? `根目录 / ${subPath} / ${name}` : `根目录 / ${name}`;
+        const fullPath = parentRelativePath ? `根目录 / ${parentRelativePath} / ${safeName}` : `根目录 / ${safeName}`;
         addLog(req, '创建文件夹', fullPath);
         res.json({ message: '文件夹创建成功' });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        const statusCode = error.message === '无效路径' || error.message.includes('名称') ? 400 : 500;
+        res.status(statusCode).json({ error: error.message });
+    }
+});
+
+// 获取空间信息
+app.get('/api/space', (req, res) => {
+    try {
+        const { fullPath: targetDir, relativePath } = resolveUploadPath(req.query.path || '');
+
+        if (!fs.existsSync(targetDir)) {
+            return res.status(404).json({ error: '目录不存在' });
+        }
+
+        const summary = getDirectoryStats(targetDir);
+        const statfs = fs.statfsSync(targetDir);
+
+        res.json({
+            path: relativePath,
+            directFileCount: summary.directFileCount,
+            directFolderCount: summary.directFolderCount,
+            totalFileCount: summary.totalFileCount,
+            totalFolderCount: summary.totalFolderCount,
+            totalSize: summary.totalSize,
+            freeSpace: statfs.bavail * statfs.bsize,
+            totalSpace: statfs.blocks * statfs.bsize,
+            usedSpace: (statfs.blocks - statfs.bfree) * statfs.bsize,
+            hostname: os.hostname()
+        });
+    } catch (error) {
+        const statusCode = error.message === '无效路径' ? 400 : 500;
+        res.status(statusCode).json({ error: error.message });
+    }
+});
+
+// 搜索文件和文件夹
+app.get('/api/search', (req, res) => {
+    const keyword = (req.query.keyword || '').trim();
+    const scope = req.query.scope === 'all' ? 'all' : 'current';
+
+    if (!keyword) {
+        return res.status(400).json({ error: '请输入搜索关键词' });
+    }
+
+    try {
+        const { fullPath: currentDir, relativePath: currentRelativePath } = resolveUploadPath(req.query.path || '');
+        const baseDir = scope === 'all' ? UPLOAD_DIR : currentDir;
+        const baseRelativePath = scope === 'all' ? '' : currentRelativePath;
+        const results = searchItems(baseDir, keyword, baseRelativePath)
+            .sort((a, b) => a.path.localeCompare(b.path, 'zh-CN'));
+
+        res.json({
+            keyword,
+            scope,
+            basePath: baseRelativePath,
+            results
+        });
+    } catch (error) {
+        const statusCode = error.message === '无效路径' ? 400 : 500;
+        res.status(statusCode).json({ error: error.message });
     }
 });
 
 // 下载文件
 app.get('/api/download', (req, res) => {
-    const filePath = req.query.path;
-    const fullPath = path.join(UPLOAD_DIR, filePath);
-    
-    if (!fs.existsSync(fullPath)) {
-        return res.status(404).json({ error: '文件不存在' });
+    try {
+        const { fullPath, relativePath } = resolveUploadPath(req.query.path || '');
+
+        if (!fs.existsSync(fullPath)) {
+            return res.status(404).json({ error: '文件不存在' });
+        }
+
+        const pathDisplay = getDisplayPath(relativePath);
+        addLog(req, '下载文件', pathDisplay);
+        res.download(fullPath);
+    } catch (error) {
+        const statusCode = error.message === '无效路径' ? 400 : 500;
+        res.status(statusCode).json({ error: error.message });
     }
-    
-    const pathDisplay = filePath ? `根目录 / ${filePath}` : '根目录';
-    addLog(req, '下载文件', pathDisplay);
-    res.download(fullPath);
 });
 
 // 删除文件或文件夹（移入回收站）
 app.delete('/api/delete', (req, res) => {
     const itemPath = req.query.path;
-    if (!itemPath || itemPath.includes('..')) {
-        return res.status(400).json({ error: '无效路径' });
-    }
-    const fullPath = path.join(UPLOAD_DIR, itemPath);
-    if (!fullPath.startsWith(UPLOAD_DIR + path.sep)) {
+    if (!itemPath) {
         return res.status(400).json({ error: '无效路径' });
     }
 
     try {
+        const { fullPath, relativePath } = resolveUploadPath(itemPath);
+
         if (!fs.existsSync(fullPath)) {
             return res.status(404).json({ error: '文件不存在' });
         }
@@ -338,7 +513,7 @@ app.delete('/api/delete', (req, res) => {
         const meta = loadTrashMeta();
         meta[trashId] = {
             trashFileName,
-            originalPath: itemPath,
+            originalPath: relativePath,
             originalName,
             deletedAt: new Date().toISOString(),
             isFolder,
@@ -346,11 +521,12 @@ app.delete('/api/delete', (req, res) => {
         };
         saveTrashMeta(meta);
 
-        const pathDisplay = `根目录 / ${itemPath}`;
+        const pathDisplay = getDisplayPath(relativePath);
         addLog(req, isFolder ? '删除文件夹' : '删除文件', `${pathDisplay} → 回收站`);
         res.json({ message: '已移入回收站' });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        const statusCode = error.message === '无效路径' ? 400 : 500;
+        res.status(statusCode).json({ error: error.message });
     }
 });
 
@@ -455,20 +631,15 @@ app.put('/api/rename', (req, res) => {
     if (!oldPath || !newName) {
         return res.status(400).json({ error: '参数不完整' });
     }
-    
-    // 验证新名称不包含路径分隔符
-    if (newName.includes('/') || newName.includes('\\')) {
-        return res.status(400).json({ error: '名称不能包含路径分隔符' });
-    }
-    
-    const oldFullPath = path.join(UPLOAD_DIR, oldPath);
-    
-    // 计算新路径：保持相同的父目录
-    const parentDir = path.dirname(oldPath);
-    const newPath = parentDir === '.' ? newName : path.join(parentDir, newName);
-    const newFullPath = path.join(UPLOAD_DIR, newPath);
-    
+
     try {
+        const safeName = validateItemName(newName);
+        const { fullPath: oldFullPath, relativePath: oldRelativePath } = resolveUploadPath(oldPath);
+
+        const parentDir = path.dirname(oldRelativePath);
+        const newPath = parentDir === '.' ? safeName : path.join(parentDir, safeName);
+        const { fullPath: newFullPath, relativePath: newRelativePath } = resolveUploadPath(newPath);
+
         if (!fs.existsSync(oldFullPath)) {
             return res.status(404).json({ error: '文件夹不存在' });
         }
@@ -479,13 +650,14 @@ app.put('/api/rename', (req, res) => {
         
         fs.renameSync(oldFullPath, newFullPath);
         
-        const oldPathDisplay = oldPath ? `根目录 / ${oldPath}` : '根目录';
-        const newPathDisplay = newPath ? `根目录 / ${newPath}` : '根目录';
+        const oldPathDisplay = getDisplayPath(oldRelativePath);
+        const newPathDisplay = getDisplayPath(newRelativePath);
         addLog(req, '重命名文件夹', `${oldPathDisplay} → ${newPathDisplay}`);
         
-        res.json({ message: '重命名成功', newPath });
+        res.json({ message: '重命名成功', newPath: newRelativePath });
     } catch (error) {
-        res.status(500).json({ error: error.message });
+        const statusCode = error.message === '无效路径' || error.message.includes('名称') ? 400 : 500;
+        res.status(statusCode).json({ error: error.message });
     }
 });
 
