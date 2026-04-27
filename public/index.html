@@ -1149,7 +1149,7 @@
                 <!-- 排序表头 -->
                 <div class="sort-header" id="sortHeader">
                     <div class="col-icon"></div>
-                    <div class="sort-col col-name active" id="sortName" onclick="setSortKey('name')">
+                    <div class="sort-col col-name" id="sortName" onclick="setSortKey('name')">
                         名称 <span class="sort-arrow" id="arrowName">↑</span>
                     </div>
                     <div class="sort-col col-type" id="sortType" onclick="setSortKey('type')">
@@ -1158,7 +1158,7 @@
                     <div class="sort-col col-size" id="sortSize" onclick="setSortKey('size')">
                         大小 <span class="sort-arrow" id="arrowSize">↑</span>
                     </div>
-                    <div class="sort-col col-date" id="sortDate" onclick="setSortKey('date')">
+                    <div class="sort-col col-date active" id="sortDate" onclick="setSortKey('date')">
                         修改日期 <span class="sort-arrow" id="arrowDate">↑</span>
                     </div>
                     <div class="col-actions"></div>
@@ -1403,7 +1403,7 @@
         let contextMenuName = ''; // 右键菜单选中的名称
         let createFolderTargetPath = null; // 创建文件夹的目标路径，null表示未设置
         let pendingDeleteAction = null; // 待执行的删除操作
-        let sortState = { key: 'name', dir: 'asc' }; // 排序状态
+        let sortState = { key: 'date', dir: 'desc' }; // 排序状态
         let lastFileData = null; // 缓存最后一次加载的数据
         let searchState = { active: false, keyword: '', scope: 'current' };
         
@@ -1949,6 +1949,7 @@
         
         // 页面加载时获取文件列表和目录树
         window.addEventListener('DOMContentLoaded', () => {
+            updateSortHeader();
             loadTree();
             loadFiles();
         });
