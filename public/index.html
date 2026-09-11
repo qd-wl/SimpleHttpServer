@@ -152,23 +152,23 @@
         }
         
         .breadcrumb {
-            padding: 15px 20px;
+            padding: 15px 20px 8px;
             background: #f9f9f9;
-            font-size: 14px;
+            font-size: 17px;
             border: none;
             border-bottom: none !important;
         }
-        
+
         .breadcrumb span {
             cursor: pointer;
-            color: #4CAF50;
+            color: #2196F3;
             padding: 2px 4px;
             transition: all 0.2s;
             display: inline-block;
         }
-        
+
         .breadcrumb span:hover {
-            color: #45a049;
+            color: #0b7dda;
         }
         
         .toolbar {
@@ -195,7 +195,7 @@
         }
 
         .search-input,
-        .search-select {
+        .search-scope-btn {
             height: 38px;
             padding: 0 12px;
             border: 1px solid #d7d7d7;
@@ -204,31 +204,125 @@
             background: white;
         }
 
-        .search-input {
-            min-width: 260px;
+        .search-input-wrap {
+            position: relative;
+            flex: 1 1 260px;
         }
 
-        .search-select {
-            appearance: none;
-            -webkit-appearance: none;
-            padding-right: 44px;
-            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' fill='none' stroke='%23333' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 14px center;
-            background-size: 12px 8px;
+        .search-input {
+            width: 100%;
+            min-width: 260px;
+            padding-right: 36px;
+            box-sizing: border-box;
+        }
+
+        .search-clear-icon {
+            display: none;
+            position: absolute;
+            right: 4px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 26px;
+            height: 26px;
+            padding: 0;
+            margin: 0;
+            box-sizing: border-box;
+            border: none;
+            background: transparent;
+            border-radius: 50%;
+            color: #999;
+            font-size: 17px;
+            line-height: 1;
+            cursor: pointer;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .search-clear-icon:hover {
+            background: #eee;
+            color: #666;
+        }
+
+        .search-clear-icon.visible {
+            display: flex;
+        }
+
+        .search-scope-wrap {
+            position: relative;
+        }
+
+        .search-scope-btn {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            color: #333;
+            white-space: nowrap;
+        }
+
+        .search-scope-btn:hover {
+            background: white;
+            border-color: #aaa;
+        }
+
+        .search-scope-btn .scope-arrow {
+            font-size: 10px;
+            color: #666;
+            transition: transform 0.15s ease;
+        }
+
+        .search-scope-btn.open .scope-arrow {
+            transform: rotate(180deg);
+        }
+
+        .search-scope-menu {
+            display: none;
+            position: absolute;
+            top: calc(100% + 4px);
+            left: 0;
+            min-width: 100%;
+            background: white;
+            border: 1px solid #d7d7d7;
+            border-radius: 6px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.14);
+            z-index: 50;
+            overflow: hidden;
+        }
+
+        .search-scope-menu.open {
+            display: block;
+        }
+
+        .scope-option {
+            padding: 9px 14px;
+            font-size: 14px;
+            cursor: pointer;
+            white-space: nowrap;
+            color: #333;
+        }
+
+        .scope-option:hover {
+            background: #f0f6ff;
+        }
+
+        .scope-option.active {
+            color: #2196F3;
+            font-weight: 600;
         }
 
         .stats-bar {
             display: flex;
-            gap: 8px;
+            gap: 6px;
             flex-wrap: wrap;
             align-items: center;
-            font-size: 13px;
+            font-size: 11px;
             color: #555;
+            padding: 0 20px 15px;
+            background: #f9f9f9;
         }
 
         .stats-chip {
-            padding: 6px 10px;
+            padding: 4px 8px;
             border-radius: 999px;
             background: #eef4ff;
             color: #355c7d;
@@ -252,11 +346,20 @@
         button.secondary {
             background: #2196F3;
         }
-        
+
         button.secondary:hover {
             background: #0b7dda;
         }
-        
+
+        /* 导航/工具类操作（返回上级、刷新）：不产生新内容，用中性色和「新建」「下载」区分开 */
+        button.btn-neutral {
+            background: #78909C;
+        }
+
+        button.btn-neutral:hover {
+            background: #64707a;
+        }
+
         .content-area {
             flex: 1;
             overflow-y: auto;
@@ -1084,10 +1187,235 @@
             align-items: center;
             gap: 10px;
         }
+
+        /* 移动端汉堡菜单按钮 / 侧边栏遮罩层 */
+        .menu-btn {
+            display: none;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 8px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .menu-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+
+        .sidebar-backdrop {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.4);
+            z-index: 900;
+        }
+
+        .sidebar-backdrop.active {
+            display: block;
+        }
+
+        /* ── 移动端适配 ── */
+        @media (max-width: 768px) {
+            .menu-btn {
+                display: inline-flex;
+            }
+
+            /* 触屏无 hover 状态，目录树的操作图标需要始终显示 */
+            .tree-item-actions {
+                display: flex;
+            }
+
+            .sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                bottom: 0;
+                width: 78%;
+                max-width: 300px;
+                min-width: 0;
+                z-index: 1000;
+                box-shadow: 2px 0 16px rgba(0,0,0,0.25);
+                transform: translateX(-100%);
+                transition: transform 0.25s ease;
+            }
+
+            .sidebar.open {
+                transform: translateX(0);
+            }
+
+            .resizer {
+                display: none;
+            }
+
+            .header {
+                padding: 12px 15px;
+                flex-wrap: wrap;
+                row-gap: 8px;
+            }
+
+            .header h1 {
+                font-size: 16px;
+                flex: 1 1 auto;
+                margin: 0 10px;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+
+            .header .log-btn {
+                padding: 6px 10px;
+                font-size: 12px;
+            }
+
+            .breadcrumb {
+                padding: 10px 15px 8px;
+                overflow-x: auto;
+                white-space: nowrap;
+            }
+
+            .toolbar {
+                padding: 10px 15px;
+                gap: 8px;
+            }
+
+            .toolbar button {
+                flex: 0 0 auto;
+                font-size: 13px;
+                padding: 8px 12px;
+            }
+
+            .utility-bar {
+                padding: 0 15px 12px;
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .search-controls {
+                width: 100%;
+            }
+
+            .search-input-wrap {
+                flex: 1 1 auto;
+                min-width: 0;
+            }
+
+            .search-input {
+                min-width: 0;
+            }
+
+            .stats-bar {
+                width: 100%;
+                padding: 0 15px 12px;
+            }
+
+            /* 文件列表在小屏上把「类型」「大小」「修改日期」挪到名称下面一行 */
+
+            /* 排序表头没有操作按钮，收起占位列避免右侧留出大片空白 */
+            .sort-header .col-actions {
+                display: none;
+            }
+
+            /* 表头收窄类型/大小/日期三列宽度，让名称列有足够空间 */
+            .sort-header .col-type {
+                width: 44px;
+                font-size: 12px;
+            }
+
+            .sort-header .col-size {
+                width: 56px;
+            }
+
+            .sort-header .col-date {
+                width: 100px;
+                font-size: 12px;
+            }
+
+            .item {
+                flex-wrap: wrap;
+                padding: 10px 12px;
+            }
+
+            .item .col-name {
+                flex: 1 1 calc(100% - 52px);
+                order: 1;
+            }
+
+            .item .col-type,
+            .item .col-size,
+            .item .col-date {
+                order: 2;
+                width: auto;
+                flex-shrink: 0;
+                font-size: 11px;
+                color: #777;
+            }
+
+            .item .col-type {
+                margin-left: 52px;
+            }
+
+            .item .col-size {
+                margin-left: 8px;
+            }
+
+            .item .col-date {
+                margin-left: 8px;
+            }
+
+            .item-actions.col-actions {
+                order: 3;
+                width: 100%;
+                flex: 1 1 100%;
+                justify-content: flex-start;
+                padding-left: 52px;
+                margin-top: 8px;
+            }
+
+            .log-row {
+                flex-wrap: wrap;
+                gap: 4px 12px;
+            }
+
+            .log-time,
+            .log-ip {
+                min-width: 0;
+            }
+
+            .modal-content,
+            .confirm-content,
+            .conflict-content,
+            .upload-modal-content,
+            .log-content {
+                width: 92%;
+            }
+
+            .modal-content,
+            .confirm-content {
+                padding: 20px;
+            }
+
+            .confirm-item {
+                flex-wrap: wrap;
+            }
+
+            .toast {
+                left: 16px;
+                right: 16px;
+                max-width: none;
+                top: 16px;
+            }
+        }
     </style>
 </head>
 <body>
     <div class="container">
+        <!-- 移动端侧边栏遮罩层 -->
+        <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebar()"></div>
+
         <!-- 左侧目录树 -->
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">📁 目录结构</div>
@@ -1111,6 +1439,7 @@
         <!-- 右侧内容区 -->
         <div class="main-content">
             <div class="header">
+                <button class="menu-btn" onclick="toggleSidebar()" title="打开目录树">☰</button>
                 <h1>📁 简单文件服务器</h1>
                 <div style="display: flex; gap: 10px;">
                     <button class="log-btn" onclick="showHelp()" title="查看使用帮助">ℹ️ 帮助</button>
@@ -1122,26 +1451,38 @@
             <div class="breadcrumb">
                 <span id="breadcrumb">根目录</span>
             </div>
-            
+
+            <div class="stats-bar" id="statsBar">
+                <span class="stats-chip">空间信息加载中...</span>
+            </div>
+
             <div class="toolbar">
                 <button onclick="triggerFileUpload()">📤 上传文件</button>
-                <button class="secondary" onclick="showCreateFolder()">📁 新建文件夹</button>
-                <button class="secondary" onclick="goBack()" id="backBtn" style="display: none;">⬅️ 返回上级</button>
-                <button class="secondary" onclick="refreshAll()">🔄 刷新</button>
+                <button onclick="showCreateFolder()">📁 新建文件夹</button>
+                <button class="btn-neutral" onclick="goBack()" id="backBtn" style="display: none;">⬅️ 返回上级</button>
+                <button class="btn-neutral" onclick="refreshAll()">🔄 刷新</button>
             </div>
 
             <div class="utility-bar">
                 <div class="search-controls">
-                    <input type="text" id="searchInput" class="search-input" placeholder="搜索文件或文件夹名称">
-                    <select id="searchScope" class="search-select">
-                        <option value="current">当前目录</option>
-                        <option value="all">全部目录</option>
-                    </select>
-                    <button class="secondary" onclick="performSearch()">🔍 搜索</button>
-                    <button class="secondary" onclick="clearSearch()">✖ 清除</button>
-                </div>
-                <div class="stats-bar" id="statsBar">
-                    <span class="stats-chip">空间信息加载中...</span>
+                    <div class="search-input-wrap">
+                        <input type="text" id="searchInput" class="search-input" placeholder="🔍 搜索文件或文件夹名称">
+                        <button type="button" class="search-clear-icon" id="searchClearIcon" onclick="clearSearch()" title="清除">✖</button>
+                    </div>
+                    <div class="search-scope-wrap">
+                        <button type="button" class="search-scope-btn" id="searchScopeBtn" onclick="toggleScopeMenu()">
+                            <span id="searchScopeLabel">当前目录</span>
+                            <span class="scope-arrow">▾</span>
+                        </button>
+                        <div class="search-scope-menu" id="searchScopeMenu">
+                            <div class="scope-option active" data-value="current" onclick="selectScope('current')">当前目录</div>
+                            <div class="scope-option" data-value="all" onclick="selectScope('all')">全部目录</div>
+                        </div>
+                        <select id="searchScope" style="display:none">
+                            <option value="current">当前目录</option>
+                            <option value="all">全部目录</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             
@@ -1221,6 +1562,7 @@
                         <li style="margin-bottom: 8px;"><strong>创建文件夹：</strong>点击"新建文件夹"按钮，在弹出的对话框中输入文件夹名称</li>
                         <li style="margin-bottom: 8px;"><strong>重命名文件夹：</strong>点击文件夹旁的"✎"按钮或右键选择"重命名"，即可修改文件夹名称</li>
                         <li style="margin-bottom: 8px;"><strong>删除文件/文件夹：</strong>点击"删除"按钮后，文件会进入<strong>回收站</strong>而非立即删除，可随时还原</li>
+                        <li style="margin-bottom: 8px;"><strong>搜索：</strong>在搜索框中输入关键字，无需点击按钮，稍作停顿会自动搜索；右侧下拉可切换"当前目录"或"全部目录"范围；输入框内的 ✖ 可一键清除搜索、恢复正常列表</li>
                         <li style="margin-bottom: 8px;"><strong>操作日志：</strong>点击右上角"日志"按钮，查看所有操作记录（含彩色类型标签）</li>
                     </ul>
 
@@ -1243,7 +1585,7 @@
                     <ul style="color: #555; padding-left: 25px;">
                         <li style="margin-bottom: 8px;"><strong>点击文件夹：</strong>左键点击文件夹可进入该文件夹，查看其中的文件和子文件夹</li>
                         <li style="margin-bottom: 8px;"><strong>展开/折叠：</strong>点击文件夹前的箭头符号可展开或折叠子文件夹</li>
-                        <li style="margin-bottom: 8px;"><strong>快捷操作：</strong>鼠标悬停在文件夹上时，右侧会显示操作按钮
+                        <li style="margin-bottom: 8px;"><strong>快捷操作：</strong>鼠标悬停在文件夹上（手机上则是常驻显示）时，右侧会显示操作按钮
                             <ul style="padding-left: 20px; margin-top: 5px;">
                                 <li>⊞/⊟ 展开/折叠所有子文件夹</li>
                                 <li>✎ 重命名文件夹</li>
@@ -1586,8 +1928,7 @@
                 }
 
                 statsBar.innerHTML = `
-                    <span class="stats-chip">当前目录 ${data.directFolderCount} 个文件夹</span>
-                    <span class="stats-chip">当前目录 ${data.directFileCount} 个文件</span>
+                    <span class="stats-chip">${data.directFolderCount} 个文件夹 · ${data.directFileCount} 个文件</span>
                     <span class="stats-chip">目录总占用 ${formatFileSize(data.totalSize)}</span>
                     <span class="stats-chip">磁盘可用 ${formatFileSize(data.freeSpace)}</span>
                 `;
@@ -1615,6 +1956,8 @@
             searchState = { active: true, keyword, scope };
             input.value = keyword;
             scopeSelect.value = scope;
+            syncScopeUI(scope);
+            updateSearchClearIcon();
             fileList.innerHTML = '<div class="loading">搜索中...</div>';
 
             try {
@@ -1635,6 +1978,7 @@
 
         function clearSearch() {
             document.getElementById('searchInput').value = '';
+            updateSearchClearIcon();
             searchState = { active: false, keyword: '', scope: document.getElementById('searchScope').value };
             loadFiles();
         }
@@ -2421,6 +2765,18 @@
             updateBackButton();
             loadFiles();
             renderTree(); // 重新渲染树以更新高亮状态
+            closeSidebar(); // 移动端选择目录后自动收起抽屉式侧边栏
+        }
+
+        // 移动端侧边栏抽屉开关
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('sidebarBackdrop').classList.toggle('active');
+        }
+
+        function closeSidebar() {
+            document.getElementById('sidebar').classList.remove('open');
+            document.getElementById('sidebarBackdrop').classList.remove('active');
         }
         
         // 更新返回按钮
@@ -2753,9 +3109,65 @@
             refreshCurrentView();
         }
 
+        // 清除图标只在输入框有内容时显示
+        function updateSearchClearIcon() {
+            const hasValue = document.getElementById('searchInput').value.length > 0;
+            document.getElementById('searchClearIcon').classList.toggle('visible', hasValue);
+        }
+
+        // 输入时自动搜索（防抖），无需再点搜索按钮
+        let searchDebounceTimer = null;
+        document.getElementById('searchInput').addEventListener('input', () => {
+            updateSearchClearIcon();
+            clearTimeout(searchDebounceTimer);
+            searchDebounceTimer = setTimeout(() => performSearch(), 300);
+        });
+
         document.getElementById('searchInput').addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
+                clearTimeout(searchDebounceTimer);
                 performSearch();
+            }
+        });
+
+        // 切换搜索范围时，如果已经在搜索中，用新范围重新搜索
+        document.getElementById('searchScope').addEventListener('change', () => {
+            if (document.getElementById('searchInput').value.trim()) {
+                performSearch();
+            }
+        });
+
+        // 自定义的搜索范围下拉菜单（原生 select 弹出层位置在部分浏览器里不对齐，改用自绘菜单）
+        function toggleScopeMenu(forceClose = false) {
+            const menu = document.getElementById('searchScopeMenu');
+            const btn = document.getElementById('searchScopeBtn');
+            const shouldOpen = forceClose ? false : !menu.classList.contains('open');
+            menu.classList.toggle('open', shouldOpen);
+            btn.classList.toggle('open', shouldOpen);
+        }
+
+        function syncScopeUI(value) {
+            document.getElementById('searchScopeLabel').textContent = value === 'all' ? '全部目录' : '当前目录';
+            document.querySelectorAll('#searchScopeMenu .scope-option').forEach(opt => {
+                opt.classList.toggle('active', opt.dataset.value === value);
+            });
+        }
+
+        function selectScope(value) {
+            const select = document.getElementById('searchScope');
+            const changed = select.value !== value;
+            select.value = value;
+            syncScopeUI(value);
+            toggleScopeMenu(true);
+            if (changed) {
+                select.dispatchEvent(new Event('change', { bubbles: true }));
+            }
+        }
+
+        document.addEventListener('click', (e) => {
+            const wrap = document.querySelector('.search-scope-wrap');
+            if (wrap && !wrap.contains(e.target)) {
+                toggleScopeMenu(true);
             }
         });
         
