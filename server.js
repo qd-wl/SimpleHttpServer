@@ -439,8 +439,28 @@ app.get('/api/check-file', (req, res) => {
     }
 });
 
+// 上传前检查磁盘剩余空间是否够用，避免把磁盘写满（局域网文件共享场景不限制单文件大小，只保证磁盘不被写爆）
+const UPLOAD_SPACE_SAFETY_MARGIN = 50 * 1024 * 1024; // 预留 50MB 缓冲
+function checkDiskSpace(req, res, next) {
+    const contentLength = parseInt(req.headers['content-length'] || '0', 10);
+    if (!contentLength) {
+        return next();
+    }
+
+    try {
+        const statfs = fs.statfsSync(UPLOAD_DIR);
+        const freeSpace = statfs.bavail * statfs.bsize;
+        if (contentLength + UPLOAD_SPACE_SAFETY_MARGIN > freeSpace) {
+            return res.status(413).json({ error: '磁盘剩余空间不足，无法上传' });
+        }
+    } catch (error) {
+        // 拿不到磁盘信息时不拦截，避免这个检查本身出错挡住正常上传
+    }
+    next();
+}
+
 // 上传文件
-app.post('/api/upload', upload.single('file'), (req, res) => {
+app.post('/api/upload', checkDiskSpace, upload.single('file'), (req, res) => {
     if (!req.file) {
         return res.status(400).json({ error: '没有上传文件' });
     }
@@ -539,6 +559,17 @@ app.get('/api/download', (req, res) => {
 
         if (!fs.existsSync(fullPath)) {
             return res.status(404).json({ error: '文件不存在' });
+        }
+
+        if (fs.statSync(fullPath).isDirectory()) {
+            return res.status(400).json({ error: '无法下载文件夹' });
+        }
+
+        // 预览（图片/视频/音频/文本/PDF）请求带 view=1：不计入下载日志，且用 inline 方式返回，
+        // 避免浏览器把 iframe/video 等预览请求也强制当附件下载
+        if (req.query.view) {
+            res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(path.basename(fullPath))}"`);
+            return res.sendFile(fullPath);
         }
 
         const pathDisplay = getDisplayPath(relativePath);

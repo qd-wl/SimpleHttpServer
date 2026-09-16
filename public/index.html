@@ -441,12 +441,46 @@
         }
 
         /* 列宽定义 */
+        .col-select  { width: 32px;  flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
         .col-icon    { width: 52px;  flex-shrink: 0; }
         .col-name    { flex: 1;      min-width: 0; }
         .col-type    { width: 80px;  flex-shrink: 0; }
         .col-size    { width: 100px; flex-shrink: 0; }
         .col-date    { width: 165px; flex-shrink: 0; }
         .col-actions { width: 130px; flex-shrink: 0; }
+
+        .col-select input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+            cursor: pointer;
+        }
+
+        .batch-action-bar {
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 10px 20px;
+            background: #eef4ff;
+            border-bottom: 1px solid #d9e7ff;
+            font-size: 13px;
+            color: #355c7d;
+            flex-wrap: wrap;
+        }
+
+        .batch-action-bar.active {
+            display: flex;
+        }
+
+        .batch-action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .batch-action-buttons button {
+            padding: 6px 14px;
+            font-size: 13px;
+        }
 
         .item {
             display: flex;
@@ -485,7 +519,8 @@
             text-overflow: ellipsis;
         }
 
-        .item.folder {
+        .item.folder,
+        .item.previewable {
             cursor: pointer;
         }
 
@@ -776,7 +811,50 @@
             color: #999;
             text-align: center;
         }
-        
+
+        .preview-image {
+            display: block;
+            max-width: 100%;
+            max-height: 70vh;
+            margin: 0 auto;
+        }
+
+        .preview-media {
+            display: block;
+            width: 100%;
+            max-height: 70vh;
+            margin: 0 auto;
+        }
+
+        .preview-audio {
+            display: block;
+            width: 100%;
+        }
+
+        .preview-pdf {
+            display: block;
+            width: 100%;
+            height: 70vh;
+            border: none;
+        }
+
+        .preview-text {
+            white-space: pre-wrap;
+            word-break: break-word;
+            font-family: 'SFMono-Regular', Consolas, Monaco, monospace;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #333;
+            margin: 0;
+        }
+
+        .preview-hint {
+            margin-top: 10px;
+            font-size: 12px;
+            color: #999;
+            text-align: center;
+        }
+
         .log-item {
             padding: 12px;
             border-bottom: 1px solid #f0f0f0;
@@ -1396,7 +1474,7 @@
             }
 
             .item .col-name {
-                flex: 1 1 calc(100% - 52px);
+                flex: 1 1 calc(100% - 84px);
                 order: 1;
             }
 
@@ -1411,7 +1489,7 @@
             }
 
             .item .col-type {
-                margin-left: 52px;
+                margin-left: 84px;
             }
 
             .item .col-size {
@@ -1427,7 +1505,7 @@
                 width: 100%;
                 flex: 1 1 100%;
                 justify-content: flex-start;
-                padding-left: 52px;
+                padding-left: 84px;
                 margin-top: 8px;
             }
 
@@ -1566,8 +1644,18 @@
                 <div class="drag-overlay" id="dragOverlay">
                     <div class="drag-overlay-text">📤 松开鼠标上传到当前目录</div>
                 </div>
+                <!-- 批量操作条 -->
+                <div class="batch-action-bar" id="batchActionBar">
+                    <span id="batchSelectedCount">已选择 0 项</span>
+                    <div class="batch-action-buttons">
+                        <button class="secondary" onclick="batchDownloadSelected()">下载</button>
+                        <button class="delete-btn" onclick="batchDeleteSelected()">删除</button>
+                        <button class="btn-neutral" onclick="clearSelection()">取消选择</button>
+                    </div>
+                </div>
                 <!-- 排序表头 -->
                 <div class="sort-header" id="sortHeader">
+                    <div class="col-select"><input type="checkbox" id="selectAllCheckbox" title="全选" onclick="toggleSelectAll(this.checked)"></div>
                     <div class="col-icon"></div>
                     <div class="sort-col col-name" id="sortName" onclick="setSortKey('name')">
                         名称 <span class="sort-arrow" id="arrowName">↑</span>
@@ -1624,6 +1712,20 @@
         </div>
     </div>
 
+    <!-- 文件预览模态框 -->
+    <div class="log-modal" id="previewModal">
+        <div class="log-content" style="max-width: 800px;">
+            <div class="log-header">
+                <h2 id="previewTitle" style="font-size:16px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">预览</h2>
+                <div style="display:flex; gap:8px; align-items:center; flex-shrink:0;">
+                    <button class="secondary" onclick="downloadCurrentPreview()">下载</button>
+                    <button class="log-close" onclick="closePreview()">×</button>
+                </div>
+            </div>
+            <div class="log-body" id="previewBody"></div>
+        </div>
+    </div>
+
     <!-- 帮助模态框 -->
     <div class="log-modal" id="helpModal">
         <div class="log-content">
@@ -1638,11 +1740,13 @@
 
                     <h4 style="color: #333; margin: 20px 0 10px 0; font-size: 16px;">🎯 主要功能</h4>
                     <ul style="color: #555; padding-left: 25px;">
-                        <li style="margin-bottom: 8px;"><strong>文件上传：</strong>点击"上传文件"按钮，可选择单个或多个文件；也可以直接把文件从桌面拖拽到右侧列表区域上传（暂不支持拖拽整个文件夹）。上传时显示实时进度条。若目录中存在同名文件，会弹出提示让你选择<strong>替换</strong>、<strong>保留两者</strong>（自动重命名为"文件名 2"）或<strong>跳过</strong></li>
+                        <li style="margin-bottom: 8px;"><strong>文件上传：</strong>点击"上传文件"按钮，可选择单个或多个文件；也可以直接把文件从桌面拖拽到右侧列表区域上传（暂不支持拖拽整个文件夹）。上传时显示实时进度条。若目录中存在同名文件，会弹出提示让你选择<strong>替换</strong>、<strong>保留两者</strong>（自动重命名为"文件名 2"）或<strong>跳过</strong>；单文件大小不限制，但磁盘剩余空间不够时会拒绝上传</li>
                         <li style="margin-bottom: 8px;"><strong>文件下载：</strong>点击文件旁的"下载"按钮即可下载文件</li>
+                        <li style="margin-bottom: 8px;"><strong>文件预览：</strong>支持预览的文件（图片、视频、音频、PDF、文本/代码，文本超过 300KB 只显示前面部分）点击整行或右键选择"预览"即可查看；不支持预览的类型不会弹窗，仍可正常下载。列表中不同类型的文件会显示不同图标，方便区分</li>
                         <li style="margin-bottom: 8px;"><strong>创建文件夹：</strong>点击"新建文件夹"按钮，在弹出的对话框中输入文件夹名称</li>
                         <li style="margin-bottom: 8px;"><strong>重命名文件/文件夹：</strong>点击文件夹旁的"✎"按钮，或在左侧目录树、右侧文件列表的文件/文件夹上右键选择"重命名"</li>
                         <li style="margin-bottom: 8px;"><strong>删除文件/文件夹：</strong>点击"删除"按钮后，文件会进入<strong>回收站</strong>而非立即删除，可随时还原</li>
+                        <li style="margin-bottom: 8px;"><strong>批量操作：</strong>文件列表每行前的复选框可多选（表头复选框全选/取消全选当前目录），选中后顶部会出现批量下载/删除按钮；批量删除同样会先进回收站，批量下载会跳过选中的文件夹</li>
                         <li style="margin-bottom: 8px;"><strong>右键菜单：</strong>右侧文件列表中，在文件或文件夹上右键可快速打开/下载、重命名、删除；手机上长按同样能弹出该菜单</li>
                         <li style="margin-bottom: 8px;"><strong>搜索：</strong>在搜索框中输入关键字，无需点击按钮，稍作停顿会自动搜索；右侧下拉可切换"当前目录"或"全部目录"范围；输入框内的 ✖ 可一键清除搜索、恢复正常列表</li>
                         <li style="margin-bottom: 8px;"><strong>操作日志：</strong>点击右上角"日志"按钮，查看所有操作记录（含彩色类型标签），最多保留最近 1000 条</li>
@@ -1825,6 +1929,10 @@
             <span>📂</span>
             <span>打开</span>
         </div>
+        <div class="context-menu-item" id="listContextPreviewItem" onclick="listContextPreview()">
+            <span>👁️</span>
+            <span>预览</span>
+        </div>
         <div class="context-menu-item" id="listContextDownloadItem" onclick="listContextDownload()">
             <span>⬇️</span>
             <span>下载</span>
@@ -1851,7 +1959,121 @@
         let sortState = { key: 'date', dir: 'desc' }; // 排序状态
         let lastFileData = null; // 缓存最后一次加载的数据
         let searchState = { active: false, keyword: '', scope: 'current' };
-        
+        let selectedItems = new Map(); // path -> { name, isFolder }，批量操作的选中项
+
+        function toggleSelectItem(path, name, isFolder, checked) {
+            if (checked) {
+                selectedItems.set(path, { name, isFolder });
+            } else {
+                selectedItems.delete(path);
+            }
+            updateBatchBar();
+        }
+
+        function toggleSelectAll(checked) {
+            document.querySelectorAll('#fileList .item-select-checkbox').forEach(checkbox => {
+                checkbox.checked = checked;
+                checkbox.dispatchEvent(new Event('change'));
+            });
+        }
+
+        function clearSelection() {
+            selectedItems.clear();
+            document.querySelectorAll('#fileList .item-select-checkbox').forEach(checkbox => {
+                checkbox.checked = false;
+            });
+            updateBatchBar();
+        }
+
+        function updateBatchBar() {
+            const bar = document.getElementById('batchActionBar');
+            const countEl = document.getElementById('batchSelectedCount');
+            const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+
+            if (selectedItems.size > 0) {
+                countEl.textContent = `已选择 ${selectedItems.size} 项`;
+                bar.classList.add('active');
+            } else {
+                bar.classList.remove('active');
+            }
+
+            if (selectAllCheckbox) {
+                const checkboxes = document.querySelectorAll('#fileList .item-select-checkbox');
+                selectAllCheckbox.checked = checkboxes.length > 0 && selectedItems.size >= checkboxes.length;
+            }
+        }
+
+        function batchDeleteSelected() {
+            if (selectedItems.size === 0) return;
+
+            const items = Array.from(selectedItems.entries());
+            const folderCount = items.filter(([, info]) => info.isFolder).length;
+            const fileCount = items.length - folderCount;
+            const parts = [];
+            if (folderCount > 0) parts.push(`${folderCount} 个文件夹`);
+            if (fileCount > 0) parts.push(`${fileCount} 个文件`);
+
+            showSimpleConfirm(
+                '批量删除',
+                `确定要删除选中的 ${parts.join('、')} 吗？`,
+                '删除后会进入回收站，可以随时还原。',
+                '删除',
+                async () => {
+                    let successCount = 0;
+                    for (const [path] of items) {
+                        try {
+                            const res = await fetch(`/api/delete?path=${encodeURIComponent(path)}`, { method: 'DELETE' });
+                            if (res.ok) successCount++;
+                        } catch (error) {
+                            console.error('批量删除失败:', error);
+                        }
+                    }
+
+                    showToast(
+                        successCount === items.length
+                            ? `🗑️ 已删除 ${successCount} 项`
+                            : `⚠️ 已删除 ${successCount}/${items.length} 项`,
+                        successCount === items.length ? 'danger' : 'error'
+                    );
+
+                    clearSelection();
+                    await loadTree();
+                    await refreshCurrentView();
+                }
+            );
+        }
+
+        function batchDownloadSelected() {
+            if (selectedItems.size === 0) return;
+
+            const items = Array.from(selectedItems.entries());
+            const fileItems = items.filter(([, info]) => !info.isFolder);
+            const folderSkipped = items.length - fileItems.length;
+
+            if (fileItems.length === 0) {
+                showToast('选中的都是文件夹，暂不支持批量下载文件夹', 'error');
+                return;
+            }
+
+            fileItems.forEach(([path], index) => {
+                setTimeout(() => {
+                    const link = document.createElement('a');
+                    link.href = `/api/download?path=${encodeURIComponent(path)}`;
+                    link.download = '';
+                    document.body.appendChild(link);
+                    link.click();
+                    link.remove();
+                }, index * 300); // 间隔触发，避免浏览器把连续弹出的多个下载当成异常拦截
+            });
+
+            showToast(
+                folderSkipped > 0
+                    ? `📥 已开始下载 ${fileItems.length} 个文件，跳过 ${folderSkipped} 个文件夹`
+                    : `📥 开始下载 ${fileItems.length} 个文件`,
+                folderSkipped > 0 ? 'error' : 'success'
+            );
+        }
+
         // 显示确认对话框
         function showConfirmDialog(title, itemName, itemType, path, onConfirm) {
             const dialog = document.getElementById('confirmDialog');
@@ -1965,16 +2187,27 @@
             return { folders: sortedFolders, files: sortedFiles };
         }
 
-        function renderFolderRow(folder, itemPath, subpath = '', subpathTarget = '', extraActions = '') {
+        // 文件/文件夹行共用的多选复选框列
+        function buildSelectColumn(itemPath, name, isFolder, selectable) {
+            if (!selectable) return '<div class="col-select"></div>';
+            const safeItemPath = escapeJsString(itemPath);
+            const safeName = escapeJsString(name);
+            const checked = selectedItems.has(itemPath) ? 'checked' : '';
+            return `<div class="col-select" onclick="event.stopPropagation()"><input type="checkbox" class="item-select-checkbox" ${checked} onchange="toggleSelectItem('${safeItemPath}', '${safeName}', ${isFolder}, this.checked)"></div>`;
+        }
+
+        function renderFolderRow(folder, itemPath, subpath = '', subpathTarget = '', extraActions = '', selectable = true) {
             const safeName = escapeHtml(folder.name);
             const safeItemPath = escapeJsString(itemPath);
             const safeSubpath = escapeHtml(subpath);
             const safeSubpathTarget = escapeJsString(subpathTarget);
             const folderIcon = folder.isEmpty ? '📂' : '📁';
             const iconClass = folder.isEmpty ? '' : 'has-content';
+            const selectCol = buildSelectColumn(itemPath, folder.name, true, selectable);
 
             return `
                 <div class="item folder" onclick="navigateTo('${safeItemPath}')" oncontextmenu="showListContextMenu(event, '${safeItemPath}', '${escapeJsString(folder.name)}', true)">
+                    ${selectCol}
                     <div class="item-icon col-icon ${iconClass}">${folderIcon}</div>
                     <div class="col-name" style="min-width:0">
                         <div class="item-name">${safeName}</div>
@@ -1991,7 +2224,7 @@
             `;
         }
 
-        function renderFileRow(file, itemPath, subpath = '', subpathTarget = '', extraActions = '') {
+        function renderFileRow(file, itemPath, subpath = '', subpathTarget = '', extraActions = '', selectable = true) {
             const safeName = escapeHtml(file.name);
             const safeItemPath = escapeJsString(itemPath);
             const safeSubpath = escapeHtml(subpath);
@@ -1999,21 +2232,25 @@
             const size = formatFileSize(file.size || 0);
             const date = new Date(file.modified).toLocaleString('zh-CN');
             const ext = file.typeLabel || (file.name.includes('.') ? file.name.split('.').pop().toUpperCase() : '文件');
+            const previewable = isPreviewable(file.name);
+            const rowClick = previewable ? `onclick="previewFile('${safeItemPath}', '${escapeJsString(file.name)}')"` : '';
+            const selectCol = buildSelectColumn(itemPath, file.name, false, selectable);
 
             return `
-                <div class="item" oncontextmenu="showListContextMenu(event, '${safeItemPath}', '${escapeJsString(file.name)}', false)">
-                    <div class="item-icon col-icon">📄</div>
+                <div class="item ${previewable ? 'previewable' : ''}" ${rowClick} oncontextmenu="showListContextMenu(event, '${safeItemPath}', '${escapeJsString(file.name)}', false)">
+                    ${selectCol}
+                    <div class="item-icon col-icon">${getFileIcon(file.name)}</div>
                     <div class="col-name" style="min-width:0">
                         <div class="item-name">${safeName}</div>
-                        ${safeSubpath ? `<div class="item-subpath ${subpathTarget ? 'link' : ''}" ${subpathTarget ? `onclick="navigateTo('${safeSubpathTarget}')"` : ''}>${safeSubpath}</div>` : ''}
+                        ${safeSubpath ? `<div class="item-subpath ${subpathTarget ? 'link' : ''}" ${subpathTarget ? `onclick="event.stopPropagation(); navigateTo('${safeSubpathTarget}')"` : ''}>${safeSubpath}</div>` : ''}
                     </div>
                     <div class="item-type col-type">${escapeHtml(ext)}</div>
                     <div class="item-size col-size">${size}</div>
                     <div class="item-date col-date">${date}</div>
                     <div class="item-actions col-actions">
                         ${extraActions}
-                        <button class="secondary" onclick="downloadByPath('${safeItemPath}')">下载</button>
-                        <button class="delete-btn" onclick="deleteByPath('${safeItemPath}', false, '${escapeJsString(file.name)}')">删除</button>
+                        <button class="secondary" onclick="event.stopPropagation(); downloadByPath('${safeItemPath}')">下载</button>
+                        <button class="delete-btn" onclick="event.stopPropagation(); deleteByPath('${safeItemPath}', false, '${escapeJsString(file.name)}')">删除</button>
                     </div>
                 </div>
             `;
@@ -2046,6 +2283,7 @@
         }
 
         async function performSearch(preserveState = false) {
+            clearSelection(); // 搜索结果不支持批量选择，避免残留旧目录里的选中状态
             const input = document.getElementById('searchInput');
             const scopeSelect = document.getElementById('searchScope');
             const keyword = preserveState ? searchState.keyword : input.value.trim();
@@ -2089,6 +2327,8 @@
 
         function renderSearchResults(results) {
             const fileList = document.getElementById('fileList');
+            // 搜索结果不支持批量选择，隐藏表头的全选复选框，避免点了没反应
+            document.getElementById('selectAllCheckbox').style.visibility = 'hidden';
 
             if (!results.length) {
                 fileList.innerHTML = '<div class="empty">没有找到匹配项</div>';
@@ -2111,7 +2351,9 @@
                     folder,
                     folder.path,
                     formatPathLabel(folder.path),
-                    folder.path
+                    folder.path,
+                    '',
+                    false
                 );
             });
             sorted.files.forEach(file => {
@@ -2119,7 +2361,9 @@
                     file,
                     file.path,
                     formatPathLabel(file.parentPath),
-                    file.parentPath
+                    file.parentPath,
+                    '',
+                    false
                 );
             });
 
@@ -2277,7 +2521,7 @@
 
                 let html = '';
                 items.forEach(item => {
-                    const icon = item.isFolder ? '📁' : '📄';
+                    const icon = item.isFolder ? '📁' : getFileIcon(item.originalName);
                     const size = item.isFolder ? '—' : formatFileSize(item.size);
                     const deletedAt = new Date(item.deletedAt).toLocaleString('zh-CN');
                     const originalDir = item.originalPath.includes('/')
@@ -2729,7 +2973,10 @@
             listContextName = name;
             listContextIsFolder = isFolder;
 
+            const previewable = !isFolder && isPreviewable(name);
+
             document.getElementById('listContextOpenItem').style.display = isFolder ? 'flex' : 'none';
+            document.getElementById('listContextPreviewItem').style.display = previewable ? 'flex' : 'none';
             document.getElementById('listContextDownloadItem').style.display = isFolder ? 'none' : 'flex';
 
             const menu = document.getElementById('listContextMenu');
@@ -2743,6 +2990,11 @@
         function listContextOpen() {
             hideListContextMenu();
             navigateTo(listContextPath);
+        }
+
+        function listContextPreview() {
+            hideListContextMenu();
+            previewFile(listContextPath, listContextName);
         }
 
         function listContextDownload() {
@@ -2852,27 +3104,40 @@
         // 显示文件列表
         function displayFiles(data) {
             const fileList = document.getElementById('fileList');
-            
+            document.getElementById('selectAllCheckbox').style.visibility = 'visible';
+
             if (data.folders.length === 0 && data.files.length === 0) {
                 fileList.innerHTML = '<div class="empty">当前文件夹为空</div>';
+                clearSelection();
                 return;
             }
 
             const sorted = sortFoldersAndFiles(data.folders, data.files);
-            
+
             let html = '';
-            
+            const currentPaths = new Set();
+
             sorted.folders.forEach(folder => {
                 const itemPath = currentPath ? `${currentPath}/${folder.name}` : folder.name;
+                currentPaths.add(itemPath);
                 html += renderFolderRow(folder, itemPath);
             });
 
             sorted.files.forEach(file => {
                 const itemPath = currentPath ? `${currentPath}/${file.name}` : file.name;
+                currentPaths.add(itemPath);
                 html += renderFileRow(file, itemPath);
             });
-            
+
             fileList.innerHTML = html;
+
+            // 移除已经不存在于当前列表中的选中项（比如被删除了），避免批量操作条计数失真
+            for (const path of selectedItems.keys()) {
+                if (!currentPaths.has(path)) {
+                    selectedItems.delete(path);
+                }
+            }
+            updateBatchBar();
         }
         
         // 格式化文件大小
@@ -2883,7 +3148,109 @@
             const i = Math.floor(Math.log(bytes) / Math.log(k));
             return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
         }
-        
+
+        // 按扩展名分类文件类型，同时驱动列表图标和预览方式
+        const FILE_KIND_EXTENSIONS = {
+            image: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp', 'ico', 'heic', 'avif'],
+            video: ['mp4', 'mov', 'avi', 'mkv', 'webm', 'm4v', 'wmv', 'flv'],
+            audio: ['mp3', 'wav', 'flac', 'aac', 'ogg', 'm4a', 'wma'],
+            pdf: ['pdf'],
+            archive: ['zip', 'rar', '7z', 'tar', 'gz', 'bz2', 'xz'],
+            doc: ['doc', 'docx', 'rtf'],
+            sheet: ['xls', 'xlsx', 'csv'],
+            slide: ['ppt', 'pptx'],
+            apk: ['apk', 'ipa'],
+            font: ['ttf', 'otf', 'woff', 'woff2'],
+            exe: ['exe', 'dmg', 'msi', 'deb', 'rpm', 'app'],
+            code: ['js', 'ts', 'jsx', 'tsx', 'py', 'java', 'c', 'cpp', 'h', 'hpp', 'cs', 'go', 'rb', 'php', 'sh', 'bash', 'sql', 'json', 'yml', 'yaml', 'xml', 'html', 'htm', 'css', 'scss', 'less', 'vue', 'md'],
+            text: ['txt', 'log', 'ini', 'conf', 'env']
+        };
+
+        const FILE_KIND_ICONS = {
+            image: '🖼️', video: '🎬', audio: '🎵', pdf: '📕', archive: '🗜️',
+            doc: '📘', sheet: '📊', slide: '📙', apk: '📱', font: '🔤',
+            exe: '⚙️', code: '🧩', text: '📄', other: '📄'
+        };
+
+        function getFileKind(name) {
+            const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
+            for (const [kind, exts] of Object.entries(FILE_KIND_EXTENSIONS)) {
+                if (exts.includes(ext)) return kind;
+            }
+            return 'other';
+        }
+
+        function getFileIcon(name) {
+            return FILE_KIND_ICONS[getFileKind(name)] || '📄';
+        }
+
+        const PREVIEWABLE_KINDS = ['image', 'video', 'audio', 'pdf', 'code', 'text'];
+        function isTextLikeKind(kind, name) {
+            // csv 本质是纯文本，虽然按图标分类归在 sheet 里，但依然可以像文本一样预览
+            return kind === 'code' || kind === 'text' || (kind === 'sheet' && name.toLowerCase().endsWith('.csv'));
+        }
+        function isPreviewable(name) {
+            const kind = getFileKind(name);
+            return PREVIEWABLE_KINDS.includes(kind) || isTextLikeKind(kind, name);
+        }
+
+        // 文件预览
+        async function previewFile(path, name) {
+            const kind = getFileKind(name);
+            const modal = document.getElementById('previewModal');
+            const title = document.getElementById('previewTitle');
+            const body = document.getElementById('previewBody');
+            const url = `/api/download?path=${encodeURIComponent(path)}&view=1`;
+
+            title.textContent = name;
+            modal.dataset.path = path;
+            body.innerHTML = '<div class="log-empty">加载中...</div>';
+            modal.classList.add('active');
+
+            if (kind === 'image') {
+                body.innerHTML = `<img src="${url}" class="preview-image" alt="${escapeHtml(name)}">`;
+            } else if (kind === 'video') {
+                body.innerHTML = `<video src="${url}" class="preview-media" controls autoplay></video>`;
+            } else if (kind === 'audio') {
+                body.innerHTML = `<audio src="${url}" class="preview-audio" controls autoplay></audio>`;
+            } else if (kind === 'pdf') {
+                body.innerHTML = `<iframe src="${url}" class="preview-pdf" title="${escapeHtml(name)}"></iframe>`;
+            } else if (isTextLikeKind(kind, name)) {
+                const MAX_PREVIEW_BYTES = 300 * 1024; // 只预览前 300KB，避免卡住浏览器
+                try {
+                    // 用 Range 请求只拉取前面一段，避免大文件被整份下载到浏览器内存里
+                    const res = await fetch(url, { headers: { Range: `bytes=0-${MAX_PREVIEW_BYTES - 1}` } });
+                    if (!res.ok) throw new Error('加载失败');
+
+                    const buffer = await res.arrayBuffer();
+                    const contentRange = res.headers.get('Content-Range'); // 形如 "bytes 0-307199/1048576"
+                    const total = contentRange ? parseInt(contentRange.split('/')[1], 10) : NaN;
+                    const truncated = !Number.isNaN(total) ? total > buffer.byteLength : buffer.byteLength >= MAX_PREVIEW_BYTES;
+
+                    let text = new TextDecoder('utf-8').decode(buffer);
+                    if (truncated) {
+                        text = text.replace(/�+$/, ''); // 截断处可能切在多字节字符中间，去掉产生的乱码字符
+                    }
+
+                    body.innerHTML = `<pre class="preview-text">${escapeHtml(text)}</pre>${truncated ? '<div class="preview-hint">内容过大，仅显示前 300KB，完整内容请下载查看</div>' : ''}`;
+                } catch (error) {
+                    body.innerHTML = '<div class="log-empty">预览加载失败，请下载查看</div>';
+                }
+            } else {
+                body.innerHTML = '<div class="log-empty">暂不支持预览该类型文件，请点击右上角"下载"查看</div>';
+            }
+        }
+
+        function closePreview() {
+            document.getElementById('previewModal').classList.remove('active');
+            document.getElementById('previewBody').innerHTML = ''; // 清空以停止视频/音频播放
+        }
+
+        function downloadCurrentPreview() {
+            const path = document.getElementById('previewModal').dataset.path;
+            if (path) downloadByPath(path);
+        }
+
         // 打开文件夹
         function openFolder(folderName) {
             exitSearchMode();
@@ -2923,6 +3290,7 @@
         function navigateTo(path) {
             exitSearchMode();
             currentPath = path;
+            clearSelection();
             updateBreadcrumb();
             updateBackButton();
             loadFiles();
@@ -3031,8 +3399,11 @@
             
             let successCount = 0;
             let failedNames  = [];
-            
+            let abortReason  = null;
+
             for (let i = 0; i < tasks.length; i++) {
+                if (abortReason) break;
+
                 const { file, mode } = tasks[i];
                 uploadCount.textContent    = `第 ${i + 1} / ${tasks.length} 个文件`;
                 uploadFileName.textContent = file.name;
@@ -3061,6 +3432,14 @@
                                 resolve();
                             } else {
                                 failedNames.push(file.name);
+                                if (xhr.status === 413) {
+                                    try {
+                                        abortReason = JSON.parse(xhr.responseText).error;
+                                    } catch (e) {
+                                        // 忽略解析失败，使用下面的兜底文案
+                                    }
+                                    abortReason = abortReason || '磁盘剩余空间不足，无法上传';
+                                }
                                 reject(new Error(file.name + ' 上传失败'));
                             }
                         });
@@ -3079,8 +3458,10 @@
             }
 
             uploadModal.classList.remove('active');
-            
-            if (successCount > 0 && failedNames.length === 0) {
+
+            if (abortReason) {
+                showToast(`❌ ${abortReason}，已停止上传${successCount > 0 ? `（已成功 ${successCount} 个）` : ''}`, 'error');
+            } else if (successCount > 0 && failedNames.length === 0) {
                 const msg = tasks.length === 1
                     ? `✅ "${tasks[0].file.name}" 上传成功！`
                     : `✅ ${successCount} 个文件全部上传成功！`;
@@ -3392,6 +3773,29 @@
             if (e.target.id === 'trashModal') {
                 closeTrash();
             }
+        });
+
+        // 点击预览模态框外部关闭
+        document.getElementById('previewModal').addEventListener('click', (e) => {
+            if (e.target.id === 'previewModal') {
+                closePreview();
+            }
+        });
+
+        // 预览窗口打开时，Ctrl/Cmd+A 只全选预览内容，不要选中背后整个页面
+        document.addEventListener('keydown', (e) => {
+            const isSelectAll = (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'a';
+            if (!isSelectAll) return;
+
+            const previewModal = document.getElementById('previewModal');
+            if (!previewModal.classList.contains('active')) return;
+
+            e.preventDefault();
+            const range = document.createRange();
+            range.selectNodeContents(document.getElementById('previewBody'));
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
         });
 
         // 点击简易确认框外部关闭
