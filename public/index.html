@@ -58,6 +58,8 @@
             border-radius: 4px;
             font-size: 14px;
             user-select: none;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
             margin: 2px 0;
             min-height: 32px;
             width: 100%;
@@ -77,16 +79,16 @@
         .tree-item.active .tree-item-icon {
             filter: brightness(1.8);
         }
-        
+
         .tree-item.active .tree-item-icon.has-content {
             filter: sepia(100%) saturate(500%) hue-rotate(190deg) brightness(1.4);
         }
-        
+
         .tree-item-icon {
             margin-right: 6px;
             font-size: 16px;
         }
-        
+
         .tree-item-icon.has-content {
             filter: sepia(100%) saturate(500%) hue-rotate(190deg) brightness(0.9);
         }
@@ -266,7 +268,7 @@
         }
 
         .search-scope-btn .scope-arrow {
-            font-size: 10px;
+            font-size: 16px;
             color: #666;
             transition: transform 0.15s ease;
         }
@@ -363,10 +365,37 @@
         .content-area {
             flex: 1;
             overflow-y: auto;
+            position: relative;
         }
-        
+
         .file-list {
             padding: 0;
+        }
+
+        .drag-overlay {
+            display: none;
+            position: absolute;
+            inset: 0;
+            background: rgba(33, 150, 243, 0.08);
+            border: 2px dashed #2196F3;
+            z-index: 40;
+            align-items: center;
+            justify-content: center;
+            pointer-events: none;
+        }
+
+        .content-area.drag-over .drag-overlay {
+            display: flex;
+        }
+
+        .drag-overlay-text {
+            background: white;
+            color: #2196F3;
+            font-size: 16px;
+            font-weight: 600;
+            padding: 10px 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 14px rgba(0,0,0,0.15);
         }
 
         /* 排序表头 */
@@ -425,6 +454,9 @@
             padding: 10px 12px;
             border-bottom: 1px solid #f0f0f0;
             transition: background 0.2s;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
         }
         
         .item:hover {
@@ -440,22 +472,21 @@
             font-size: 22px;
             flex-shrink: 0;
         }
-        
+
         .item-icon.has-content {
             filter: sepia(100%) saturate(500%) hue-rotate(190deg) brightness(0.9);
         }
-        
+
         .item-name {
             font-weight: 500;
-            cursor: pointer;
             color: #333;
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
         }
-        
-        .item-name:hover {
-            text-decoration: underline;
+
+        .item.folder {
+            cursor: pointer;
         }
 
         .item-type {
@@ -735,6 +766,15 @@
             flex: 1;
             overflow-y: auto;
             padding: 20px;
+        }
+
+        .log-footer {
+            flex-shrink: 0;
+            padding: 10px 20px;
+            border-top: 1px solid #e0e0e0;
+            font-size: 12px;
+            color: #999;
+            text-align: center;
         }
         
         .log-item {
@@ -1062,6 +1102,14 @@
         .context-menu-item:hover {
             background: #f5f5f5;
         }
+
+        .context-menu-item.danger {
+            color: #f44336;
+        }
+
+        .context-menu-item.danger:hover {
+            background: #fdecea;
+        }
         
         .tree-item-actions {
             margin-left: auto;
@@ -1307,6 +1355,14 @@
                 min-width: 0;
             }
 
+            .search-scope-btn {
+                padding: 0 14px;
+            }
+
+            .search-scope-btn .scope-arrow {
+                font-size: 20px;
+            }
+
             .stats-bar {
                 width: 100%;
                 padding: 0 15px 12px;
@@ -1373,6 +1429,26 @@
                 justify-content: flex-start;
                 padding-left: 52px;
                 margin-top: 8px;
+            }
+
+            /* 回收站条目在小屏上把「还原/彻底删除」按钮挪到下面一行，避免挤压路径和时间文字 */
+            .trash-item {
+                flex-wrap: wrap;
+            }
+
+            .trash-item-actions {
+                order: 3;
+                flex: 1 1 100%;
+                justify-content: flex-end;
+                margin-top: 8px;
+            }
+
+            .trash-item-path,
+            .trash-item-meta {
+                white-space: normal;
+                overflow: visible;
+                text-overflow: clip;
+                word-break: break-word;
             }
 
             .log-row {
@@ -1486,7 +1562,10 @@
                 </div>
             </div>
             
-            <div class="content-area">
+            <div class="content-area" id="contentArea">
+                <div class="drag-overlay" id="dragOverlay">
+                    <div class="drag-overlay-text">📤 松开鼠标上传到当前目录</div>
+                </div>
                 <!-- 排序表头 -->
                 <div class="sort-header" id="sortHeader">
                     <div class="col-icon"></div>
@@ -1527,6 +1606,7 @@
             <div class="log-body" id="trashBody">
                 <div class="log-empty">加载中...</div>
             </div>
+            <div class="log-footer">回收站中的文件/文件夹超过 15 天会自动彻底删除</div>
         </div>
     </div>
 
@@ -1540,9 +1620,10 @@
             <div class="log-body" id="logBody">
                 <div class="log-empty">加载中...</div>
             </div>
+            <div class="log-footer">仅保留最近 1000 条操作记录</div>
         </div>
     </div>
-    
+
     <!-- 帮助模态框 -->
     <div class="log-modal" id="helpModal">
         <div class="log-content">
@@ -1557,13 +1638,14 @@
 
                     <h4 style="color: #333; margin: 20px 0 10px 0; font-size: 16px;">🎯 主要功能</h4>
                     <ul style="color: #555; padding-left: 25px;">
-                        <li style="margin-bottom: 8px;"><strong>文件上传：</strong>点击"上传文件"按钮，可选择单个或多个文件。上传时显示实时进度条。若目录中存在同名文件，会弹出提示让你选择<strong>替换</strong>、<strong>保留两者</strong>（自动重命名为"文件名 2"）或<strong>跳过</strong></li>
+                        <li style="margin-bottom: 8px;"><strong>文件上传：</strong>点击"上传文件"按钮，可选择单个或多个文件；也可以直接把文件从桌面拖拽到右侧列表区域上传（暂不支持拖拽整个文件夹）。上传时显示实时进度条。若目录中存在同名文件，会弹出提示让你选择<strong>替换</strong>、<strong>保留两者</strong>（自动重命名为"文件名 2"）或<strong>跳过</strong></li>
                         <li style="margin-bottom: 8px;"><strong>文件下载：</strong>点击文件旁的"下载"按钮即可下载文件</li>
                         <li style="margin-bottom: 8px;"><strong>创建文件夹：</strong>点击"新建文件夹"按钮，在弹出的对话框中输入文件夹名称</li>
-                        <li style="margin-bottom: 8px;"><strong>重命名文件夹：</strong>点击文件夹旁的"✎"按钮或右键选择"重命名"，即可修改文件夹名称</li>
+                        <li style="margin-bottom: 8px;"><strong>重命名文件/文件夹：</strong>点击文件夹旁的"✎"按钮，或在左侧目录树、右侧文件列表的文件/文件夹上右键选择"重命名"</li>
                         <li style="margin-bottom: 8px;"><strong>删除文件/文件夹：</strong>点击"删除"按钮后，文件会进入<strong>回收站</strong>而非立即删除，可随时还原</li>
+                        <li style="margin-bottom: 8px;"><strong>右键菜单：</strong>右侧文件列表中，在文件或文件夹上右键可快速打开/下载、重命名、删除；手机上长按同样能弹出该菜单</li>
                         <li style="margin-bottom: 8px;"><strong>搜索：</strong>在搜索框中输入关键字，无需点击按钮，稍作停顿会自动搜索；右侧下拉可切换"当前目录"或"全部目录"范围；输入框内的 ✖ 可一键清除搜索、恢复正常列表</li>
-                        <li style="margin-bottom: 8px;"><strong>操作日志：</strong>点击右上角"日志"按钮，查看所有操作记录（含彩色类型标签）</li>
+                        <li style="margin-bottom: 8px;"><strong>操作日志：</strong>点击右上角"日志"按钮，查看所有操作记录（含彩色类型标签），最多保留最近 1000 条</li>
                     </ul>
 
                     <h4 style="color: #333; margin: 20px 0 10px 0; font-size: 16px;">🗑️ 回收站</h4>
@@ -1572,6 +1654,7 @@
                         <li style="margin-bottom: 8px;"><strong>还原：</strong>将文件/文件夹恢复到原来的位置（若原路径已被占用，自动重命名）</li>
                         <li style="margin-bottom: 8px;"><strong>彻底删除：</strong>从回收站永久删除，无法恢复，操作前会弹出二次确认</li>
                         <li style="margin-bottom: 8px;"><strong>清空回收站：</strong>一键删除回收站中的所有内容，操作前会弹出二次确认</li>
+                        <li style="margin-bottom: 8px;"><strong>自动清理：</strong>回收站中的文件/文件夹超过 15 天会被系统自动彻底删除，无法恢复</li>
                     </ul>
 
                     <h4 style="color: #333; margin: 20px 0 10px 0; font-size: 16px;">📊 文件排序</h4>
@@ -1593,7 +1676,7 @@
                                 <li>× 删除文件夹</li>
                             </ul>
                         </li>
-                        <li style="margin-bottom: 8px;"><strong>右键菜单：</strong>在文件夹上点击鼠标右键，可快速访问更多操作</li>
+                        <li style="margin-bottom: 8px;"><strong>右键菜单：</strong>在文件夹上点击鼠标右键，可快速访问更多操作；手机上长按同样能弹出该菜单</li>
                     </ul>
 
                     <h4 style="color: #333; margin: 20px 0 10px 0; font-size: 16px;">💡 使用技巧</h4>
@@ -1658,7 +1741,7 @@
     <!-- 重命名文件夹模态框 -->
     <div class="modal" id="renameFolderModal">
         <div class="modal-content">
-            <h2>重命名文件夹</h2>
+            <h2 id="renameModalTitle">重命名文件夹</h2>
             <div class="confirm-item" style="margin-bottom: 16px;">
                 <span class="confirm-label">位置：</span>
                 <span class="confirm-path" id="renamePathDisplay">根目录</span>
@@ -1730,13 +1813,33 @@
             <span>⊟</span>
             <span>折叠所有子文件夹</span>
         </div>
-        <div class="context-menu-item" onclick="contextDeleteFolder()" id="contextDeleteItem">
+        <div class="context-menu-item danger" onclick="contextDeleteFolder()" id="contextDeleteItem">
             <span>🗑️</span>
             <span>删除文件夹</span>
         </div>
     </div>
+
+    <!-- 文件列表右键菜单 -->
+    <div class="context-menu" id="listContextMenu">
+        <div class="context-menu-item" id="listContextOpenItem" onclick="listContextOpen()">
+            <span>📂</span>
+            <span>打开</span>
+        </div>
+        <div class="context-menu-item" id="listContextDownloadItem" onclick="listContextDownload()">
+            <span>⬇️</span>
+            <span>下载</span>
+        </div>
+        <div class="context-menu-item" onclick="listContextRename()">
+            <span>✎</span>
+            <span>重命名</span>
+        </div>
+        <div class="context-menu-item danger" onclick="listContextDelete()">
+            <span>🗑️</span>
+            <span>删除</span>
+        </div>
     </div>
-    
+    </div>
+
     <script>
         let currentPath = '';
         let treeData = [];
@@ -1816,6 +1919,7 @@
                 .replace(/'/g, "\\'");
         }
 
+
         function formatPathLabel(targetPath) {
             return targetPath ? `根目录 / ${targetPath}` : '根目录';
         }
@@ -1870,18 +1974,18 @@
             const iconClass = folder.isEmpty ? '' : 'has-content';
 
             return `
-                <div class="item folder">
+                <div class="item folder" onclick="navigateTo('${safeItemPath}')" oncontextmenu="showListContextMenu(event, '${safeItemPath}', '${escapeJsString(folder.name)}', true)">
                     <div class="item-icon col-icon ${iconClass}">${folderIcon}</div>
                     <div class="col-name" style="min-width:0">
-                        <div class="item-name" onclick="navigateTo('${safeItemPath}')">${safeName}</div>
-                        ${safeSubpath ? `<div class="item-subpath ${subpathTarget ? 'link' : ''}" ${subpathTarget ? `onclick="navigateTo('${safeSubpathTarget}')"` : ''}>${safeSubpath}</div>` : ''}
+                        <div class="item-name">${safeName}</div>
+                        ${safeSubpath ? `<div class="item-subpath ${subpathTarget ? 'link' : ''}" ${subpathTarget ? `onclick="event.stopPropagation(); navigateTo('${safeSubpathTarget}')"` : ''}>${safeSubpath}</div>` : ''}
                     </div>
                     <div class="item-type col-type">文件夹</div>
                     <div class="item-size col-size">—</div>
                     <div class="item-date col-date">—</div>
                     <div class="item-actions col-actions">
                         ${extraActions}
-                        <button class="delete-btn" onclick="deleteByPath('${safeItemPath}', true, '${escapeJsString(folder.name)}')">删除</button>
+                        <button class="delete-btn" onclick="event.stopPropagation(); deleteByPath('${safeItemPath}', true, '${escapeJsString(folder.name)}')">删除</button>
                     </div>
                 </div>
             `;
@@ -1897,7 +2001,7 @@
             const ext = file.typeLabel || (file.name.includes('.') ? file.name.split('.').pop().toUpperCase() : '文件');
 
             return `
-                <div class="item">
+                <div class="item" oncontextmenu="showListContextMenu(event, '${safeItemPath}', '${escapeJsString(file.name)}', false)">
                     <div class="item-icon col-icon">📄</div>
                     <div class="col-name" style="min-width:0">
                         <div class="item-name">${safeName}</div>
@@ -2098,7 +2202,7 @@
                         actionClass = 'delete-folder';
                     } else if (log.action === '创建文件夹') {
                         actionClass = 'create';
-                    } else if (log.action === '重命名文件夹') {
+                    } else if (log.action === '重命名文件夹' || log.action === '重命名文件') {
                         actionClass = 'rename';
                     } else if (log.action === '还原文件') {
                         actionClass = 'restore';
@@ -2185,7 +2289,7 @@
                             <div class="trash-item-icon">${icon}</div>
                             <div class="trash-item-info">
                                 <div class="trash-item-name">${safeName}</div>
-                                <div class="trash-item-path">原目录：${originalDir}</div>
+                                <div class="trash-item-path">${originalDir}</div>
                                 <div class="trash-item-meta">${size} &nbsp;·&nbsp; 删除于 ${deletedAt}</div>
                             </div>
                             <div class="trash-item-actions">
@@ -2351,11 +2455,11 @@
                 const iconClass = item.isEmpty ? '' : 'has-content';
                 // 展开/收拢图标
                 const expandIcon = isExpanded ? '⊟' : '⊞';
-                
+
                 html += `
                     <div>
-                        <div class="tree-item ${isActive ? 'active' : ''}" 
-                             onclick="navigateTo('${item.path}')" 
+                        <div class="tree-item ${isActive ? 'active' : ''}"
+                             onclick="navigateTo('${item.path}')"
                              oncontextmenu="showContextMenu(event, '${item.path}', '${item.name}')"
                              style="padding-left: ${level * 8}px">
                             ${hasChildren ? `<span class="tree-toggle" onclick="event.stopPropagation(); toggleFolder('${item.path}')">${toggleIcon}</span>` : '<span class="tree-toggle"></span>'}
@@ -2495,6 +2599,23 @@
             return true;
         }
         
+        // 将右键菜单定位到点击点，并夹紧到视口范围内防止溢出屏幕
+        function positionContextMenu(menu, x, y) {
+            menu.style.left = '0px';
+            menu.style.top = '0px';
+            menu.classList.add('active');
+
+            const margin = 8;
+            const rect = menu.getBoundingClientRect();
+            let left = Math.min(x, window.innerWidth - rect.width - margin);
+            let top = Math.min(y, window.innerHeight - rect.height - margin);
+            left = Math.max(margin, left);
+            top = Math.max(margin, top);
+
+            menu.style.left = left + 'px';
+            menu.style.top = top + 'px';
+        }
+
         // 显示右键菜单
         function showContextMenu(event, path, name) {
             event.preventDefault();
@@ -2535,11 +2656,9 @@
                 }
             }
             
-            menu.style.left = event.pageX + 'px';
-            menu.style.top = event.pageY + 'px';
-            menu.classList.add('active');
+            positionContextMenu(menu, event.clientX, event.clientY);
         }
-        
+
         // 隐藏右键菜单
         function hideContextMenu() {
             document.getElementById('contextMenu').classList.remove('active');
@@ -2597,7 +2716,50 @@
             }
             renderTree();
         }
-        
+
+        // 文件列表右键菜单
+        let listContextPath = '';
+        let listContextName = '';
+        let listContextIsFolder = false;
+
+        function showListContextMenu(event, path, name, isFolder) {
+            event.preventDefault();
+            event.stopPropagation();
+            listContextPath = path;
+            listContextName = name;
+            listContextIsFolder = isFolder;
+
+            document.getElementById('listContextOpenItem').style.display = isFolder ? 'flex' : 'none';
+            document.getElementById('listContextDownloadItem').style.display = isFolder ? 'none' : 'flex';
+
+            const menu = document.getElementById('listContextMenu');
+            positionContextMenu(menu, event.clientX, event.clientY);
+        }
+
+        function hideListContextMenu() {
+            document.getElementById('listContextMenu').classList.remove('active');
+        }
+
+        function listContextOpen() {
+            hideListContextMenu();
+            navigateTo(listContextPath);
+        }
+
+        function listContextDownload() {
+            hideListContextMenu();
+            downloadByPath(listContextPath);
+        }
+
+        function listContextRename() {
+            hideListContextMenu();
+            renameFolder(listContextPath, listContextName, listContextIsFolder);
+        }
+
+        function listContextDelete() {
+            hideListContextMenu();
+            deleteByPath(listContextPath, listContextIsFolder, listContextName);
+        }
+
         // 创建子文件夹
         function createSubfolder(parentPath) {
             createFolderTargetPath = parentPath;
@@ -2823,12 +2985,17 @@
             }
         }
 
-        // 上传文件
-        async function uploadFile() {
+        // 触发文件选择框上传
+        function uploadFile() {
             const input = document.getElementById('fileInput');
             const files = Array.from(input.files);
-            
-            if (files.length === 0) return;
+            input.value = '';
+            uploadFiles(files);
+        }
+
+        // 上传文件（供文件选择框和拖拽上传共用）
+        async function uploadFiles(files) {
+            if (!files || files.length === 0) return;
 
             // 第一步：冲突检测，决定每个文件的处理方式
             const tasks = []; // { file, mode }
@@ -2850,7 +3017,6 @@
             }
 
             if (tasks.length === 0) {
-                input.value = '';
                 return;
             }
 
@@ -2911,8 +3077,7 @@
                     console.error('上传失败:', error);
                 }
             }
-            
-            input.value = '';
+
             uploadModal.classList.remove('active');
             
             if (successCount > 0 && failedNames.length === 0) {
@@ -3002,9 +3167,10 @@
         // 重命名文件夹
         let renameFolderPath = '';
         
-        function renameFolder(folderPath, folderName) {
+        function renameFolder(folderPath, folderName, isFolder = true) {
             renameFolderPath = folderPath;
-            
+            document.getElementById('renameModalTitle').textContent = isFolder ? '重命名文件夹' : '重命名文件';
+
             // 设置位置显示
             const parentPath = folderPath.split('/').slice(0, -1).join('/');
             const pathDisplay = parentPath === '' ? '根目录' : `根目录 / ${parentPath}`;
@@ -3045,17 +3211,18 @@
                 
                 if (response.ok) {
                     const data = await response.json();
+                    const oldPath = renameFolderPath;
                     closeRenameModal();
-                    
+
                     // 如果重命名的是当前路径或其父路径，需要更新当前路径
-                    if (currentPath === renameFolderPath || currentPath.startsWith(renameFolderPath + '/')) {
+                    if (oldPath !== '' && (currentPath === oldPath || currentPath.startsWith(oldPath + '/'))) {
                         // 替换当前路径中的旧名称
-                        currentPath = currentPath.replace(renameFolderPath, data.newPath);
+                        currentPath = data.newPath + currentPath.slice(oldPath.length);
                     }
-                    
+
                     // 保持展开状态
-                    if (expandedFolders.has(renameFolderPath)) {
-                        expandedFolders.delete(renameFolderPath);
+                    if (expandedFolders.has(oldPath)) {
+                        expandedFolders.delete(oldPath);
                         expandedFolders.add(data.newPath);
                     }
                     
@@ -3237,13 +3404,158 @@
         // 点击页面其他地方关闭右键菜单
         document.addEventListener('click', () => {
             hideContextMenu();
+            hideListContextMenu();
         });
-        
+
         // 防止右键菜单内点击关闭菜单
         document.getElementById('contextMenu').addEventListener('click', (e) => {
             e.stopPropagation();
         });
-        
+
+        document.getElementById('listContextMenu').addEventListener('click', (e) => {
+            e.stopPropagation();
+        });
+
+        // 移动端长按模拟右键：真机长按不会触发 contextmenu 事件，
+        // 系统会优先弹出文本选择/呼出菜单，因此手动用 touch 事件计时实现。
+        // 依赖 .tree-item / .item 上的内联 oncontextmenu="..." 属性（el.oncontextmenu 是函数）来复用桌面端逻辑，
+        // 若以后改成 addEventListener('contextmenu', ...) 绑定，这里要同步改造，否则长按会静默失效。
+        (function enableLongPressContextMenu() {
+            const LONG_PRESS_MS = 550;
+            const MOVE_TOLERANCE = 10;
+            let timer = null;
+            let startX = 0;
+            let startY = 0;
+            let triggeredEl = null;
+
+            document.body.addEventListener('touchstart', (e) => {
+                const el = e.target.closest('.tree-item, .item');
+                if (!el) return;
+                const touch = e.touches[0];
+                startX = touch.clientX;
+                startY = touch.clientY;
+                triggeredEl = null;
+                timer = setTimeout(() => {
+                    if (typeof el.oncontextmenu === 'function') {
+                        triggeredEl = el;
+                        el.oncontextmenu({
+                            preventDefault() {},
+                            stopPropagation() {},
+                            clientX: startX,
+                            clientY: startY
+                        });
+                        if (navigator.vibrate) navigator.vibrate(10);
+                    }
+                    timer = null;
+                }, LONG_PRESS_MS);
+            }, { passive: true });
+
+            document.body.addEventListener('touchmove', (e) => {
+                if (!timer) return;
+                const touch = e.touches[0];
+                if (Math.abs(touch.clientX - startX) > MOVE_TOLERANCE || Math.abs(touch.clientY - startY) > MOVE_TOLERANCE) {
+                    clearTimeout(timer);
+                    timer = null;
+                }
+            }, { passive: true });
+
+            document.body.addEventListener('touchend', (e) => {
+                if (timer) {
+                    clearTimeout(timer);
+                    timer = null;
+                }
+                if (triggeredEl) {
+                    // 长按已弹出菜单，阻止随后的模拟 click（导致误触打开/导航）
+                    e.preventDefault();
+                    triggeredEl = null;
+                }
+            });
+
+            document.body.addEventListener('touchcancel', () => {
+                if (timer) {
+                    clearTimeout(timer);
+                    timer = null;
+                }
+                triggeredEl = null;
+            });
+        })();
+
+        // 拖拽文件到文件列表区域直接上传
+        (function enableDragDropUpload() {
+            const contentArea = document.getElementById('contentArea');
+            if (!contentArea) return;
+
+            let dragCounter = 0;
+
+            function isFileDrag(e) {
+                return e.dataTransfer && Array.from(e.dataTransfer.types || []).includes('Files');
+            }
+
+            contentArea.addEventListener('dragenter', (e) => {
+                if (!isFileDrag(e)) return;
+                e.preventDefault();
+                dragCounter++;
+                contentArea.classList.add('drag-over');
+            });
+
+            contentArea.addEventListener('dragover', (e) => {
+                if (!isFileDrag(e)) return;
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'copy';
+            });
+
+            contentArea.addEventListener('dragleave', (e) => {
+                if (!isFileDrag(e)) return;
+                dragCounter = Math.max(0, dragCounter - 1);
+                if (dragCounter === 0) {
+                    contentArea.classList.remove('drag-over');
+                }
+            });
+
+            contentArea.addEventListener('drop', (e) => {
+                if (!isFileDrag(e)) return;
+                e.preventDefault();
+                dragCounter = 0;
+                contentArea.classList.remove('drag-over');
+
+                const files = [];
+                let folderCount = 0;
+                const items = e.dataTransfer.items;
+
+                if (items && items.length && typeof items[0].webkitGetAsEntry === 'function') {
+                    // 通过 webkitGetAsEntry 区分文件夹和文件，暂不支持拖拽整个文件夹上传
+                    for (const item of items) {
+                        if (item.kind !== 'file') continue;
+                        const entry = item.webkitGetAsEntry();
+                        if (entry && entry.isDirectory) {
+                            folderCount++;
+                            continue;
+                        }
+                        const file = item.getAsFile();
+                        if (file) files.push(file);
+                    }
+                } else {
+                    files.push(...Array.from(e.dataTransfer.files));
+                }
+
+                if (folderCount > 0) {
+                    showToast(`暂不支持拖拽上传文件夹，已跳过 ${folderCount} 个文件夹`, 'error');
+                }
+
+                if (files.length > 0) {
+                    uploadFiles(files);
+                }
+            });
+
+            // 防止拖拽文件松手时落在区域外，导致浏览器直接打开/跳转到该文件
+            window.addEventListener('dragover', (e) => {
+                if (isFileDrag(e)) e.preventDefault();
+            });
+            window.addEventListener('drop', (e) => {
+                if (isFileDrag(e)) e.preventDefault();
+            });
+        })();
+
         // 拖动调整侧边栏宽度
         const resizer = document.getElementById('resizer');
         const sidebar = document.getElementById('sidebar');

@@ -12,6 +12,15 @@ const LOGS_DIR   = path.join(__dirname, 'logs');
 const TRASH_DIR  = path.join(__dirname, 'trash');
 const TRASH_META = path.join(TRASH_DIR, '_meta.json');
 
+// 回收站保留天数，超过后自动彻底删除
+const TRASH_RETENTION_DAYS = 15;
+
+// 系统自动生成的隐藏文件，前端列表/目录树/搜索中统一隐藏
+const IGNORED_ENTRIES = new Set(['.DS_Store', 'Thumbs.db', 'desktop.ini']);
+function isIgnoredEntry(name) {
+    return IGNORED_ENTRIES.has(name);
+}
+
 // 确保回收站目录存在
 if (!fs.existsSync(TRASH_DIR)) {
     fs.mkdirSync(TRASH_DIR, { recursive: true });
@@ -66,17 +75,25 @@ function loadLogs() {
     }
 }
 
-// 记录操作日志
+// 记录操作日志（req 为 null 时视为系统自动触发，例如定时清理任务）
 function addLog(req, action, details = '') {
-    // 清理IP地址，去掉IPv6前缀
-    let ip = req.ip || req.connection.remoteAddress || '';
-    ip = ip.replace('::ffff:', '').replace('::1', 'localhost');
-    
+    let ip = 'system';
+    let hostname = 'system';
+    let userAgent = 'system';
+
+    if (req) {
+        // 清理IP地址，去掉IPv6前缀
+        ip = req.ip || req.connection.remoteAddress || '';
+        ip = ip.replace('::ffff:', '').replace('::1', 'localhost');
+        hostname = req.hostname;
+        userAgent = req.get('user-agent');
+    }
+
     const log = {
         id: Date.now(),
         ip: ip,
-        hostname: req.hostname,
-        userAgent: req.get('user-agent'),
+        hostname: hostname,
+        userAgent: userAgent,
         action: action,
         details: details,
         timestamp: new Date().toISOString()
@@ -113,6 +130,50 @@ function saveTrashMeta(meta) {
     fs.writeFileSync(TRASH_META, JSON.stringify(meta, null, 2), 'utf8');
 }
 
+// 清理回收站中超过保留期限的条目
+let lastTrashPurgeAt = 0;
+const TRASH_PURGE_MIN_INTERVAL = 60 * 1000; // 避免同步删除文件的开销在短时间内被频繁触发（如反复打开回收站）
+
+function purgeExpiredTrash() {
+    if (Date.now() - lastTrashPurgeAt < TRASH_PURGE_MIN_INTERVAL) {
+        return;
+    }
+    lastTrashPurgeAt = Date.now();
+
+    const meta = loadTrashMeta();
+    const maxAge = TRASH_RETENTION_DAYS * 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    let changed = false;
+
+    for (const [id, item] of Object.entries(meta)) {
+        if (now - new Date(item.deletedAt).getTime() < maxAge) {
+            continue;
+        }
+
+        const trashPath = path.join(TRASH_DIR, item.trashFileName);
+        try {
+            if (fs.existsSync(trashPath)) {
+                if (item.isFolder) {
+                    fs.rmSync(trashPath, { recursive: true });
+                } else {
+                    fs.unlinkSync(trashPath);
+                }
+            }
+        } catch (error) {
+            console.error('自动清理回收站失败:', error);
+            continue;
+        }
+
+        delete meta[id];
+        changed = true;
+        addLog(null, '彻底删除', `${item.originalPath}（回收站保留超过 ${TRASH_RETENTION_DAYS} 天，自动清理）`);
+    }
+
+    if (changed) {
+        saveTrashMeta(meta);
+    }
+}
+
 function resolveUploadPath(relativePath = '') {
     const normalized = path.normalize(relativePath || '').replace(/^([/\\])+/, '');
     const fullPath = path.resolve(UPLOAD_DIR, normalized);
@@ -141,7 +202,7 @@ function validateItemName(name) {
 }
 
 function getDisplayPath(relativePath = '') {
-    return relativePath ? `根目录 / ${relativePath}` : '根目录';
+    return relativePath || '根目录';
 }
 
 function getDirectoryStats(dirPath) {
@@ -157,7 +218,7 @@ function getDirectoryStats(dirPath) {
         return summary;
     }
 
-    const entries = fs.readdirSync(dirPath);
+    const entries = fs.readdirSync(dirPath).filter(entry => !isIgnoredEntry(entry));
 
     entries.forEach(entry => {
         const entryPath = path.join(dirPath, entry);
@@ -186,7 +247,7 @@ function searchItems(baseDir, keyword, relativeBasePath = '', results = []) {
         return results;
     }
 
-    const entries = fs.readdirSync(baseDir);
+    const entries = fs.readdirSync(baseDir).filter(entry => !isIgnoredEntry(entry));
     const needle = keyword.toLowerCase();
 
     entries.forEach(entry => {
@@ -221,6 +282,10 @@ loadLogs();
 if (!fs.existsSync(UPLOAD_DIR)) {
     fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
+
+// 启动时清理一次过期回收站条目，之后每小时定期检查
+purgeExpiredTrash();
+setInterval(purgeExpiredTrash, 60 * 60 * 1000);
 
 // 配置文件上传
 const storage = multer.diskStorage({
@@ -290,17 +355,17 @@ function buildTree(dirPath, relativePath) {
         return items;
     }
     
-    const entries = fs.readdirSync(dirPath);
-    
+    const entries = fs.readdirSync(dirPath).filter(entry => !isIgnoredEntry(entry));
+
     entries.forEach(entry => {
         const fullPath = path.join(dirPath, entry);
         const stat = fs.statSync(fullPath);
         const itemPath = relativePath ? `${relativePath}/${entry}` : entry;
-        
+
         if (stat.isDirectory()) {
             const children = buildTree(fullPath, itemPath);
             // 检查文件夹是否为空（没有子文件夹也没有文件）
-            const allEntries = fs.readdirSync(fullPath);
+            const allEntries = fs.readdirSync(fullPath).filter(e => !isIgnoredEntry(e));
             const isEmpty = allEntries.length === 0;
             
             items.push({
@@ -325,17 +390,17 @@ app.get('/api/files', (req, res) => {
             return res.json({ files: [], folders: [] });
         }
 
-        const items = fs.readdirSync(targetDir);
+        const items = fs.readdirSync(targetDir).filter(item => !isIgnoredEntry(item));
         const files = [];
         const folders = [];
-        
+
         items.forEach(item => {
             const itemPath = path.join(targetDir, item);
             const stat = fs.statSync(itemPath);
-            
+
             if (stat.isDirectory()) {
                 // 检查文件夹是否为空
-                const folderEntries = fs.readdirSync(itemPath);
+                const folderEntries = fs.readdirSync(itemPath).filter(e => !isIgnoredEntry(e));
                 const isEmpty = folderEntries.length === 0;
                 
                 folders.push({
@@ -380,7 +445,7 @@ app.post('/api/upload', upload.single('file'), (req, res) => {
         return res.status(400).json({ error: '没有上传文件' });
     }
     const targetPath = req.query.path || '';
-    const fullPath = targetPath ? `根目录 / ${targetPath} / ${req.file.filename}` : `根目录 / ${req.file.filename}`;
+    const fullPath = targetPath ? `${targetPath}/${req.file.filename}` : req.file.filename;
     addLog(req, '上传文件', fullPath);
     res.json({ 
         message: '文件上传成功',
@@ -400,7 +465,7 @@ app.post('/api/mkdir', (req, res) => {
             return res.status(400).json({ error: '文件夹已存在' });
         }
         fs.mkdirSync(targetDir, { recursive: true });
-        const fullPath = parentRelativePath ? `根目录 / ${parentRelativePath} / ${safeName}` : `根目录 / ${safeName}`;
+        const fullPath = parentRelativePath ? `${parentRelativePath}/${safeName}` : safeName;
         addLog(req, '创建文件夹', fullPath);
         res.json({ message: '文件夹创建成功' });
     } catch (error) {
@@ -534,6 +599,7 @@ app.delete('/api/delete', (req, res) => {
 
 // 获取回收站列表
 app.get('/api/trash', (req, res) => {
+    purgeExpiredTrash();
     const meta = loadTrashMeta();
     const items = Object.entries(meta).map(([id, info]) => ({ id, ...info }))
         .sort((a, b) => new Date(b.deletedAt) - new Date(a.deletedAt));
@@ -641,18 +707,19 @@ app.put('/api/rename', (req, res) => {
         const { fullPath: newFullPath, relativePath: newRelativePath } = resolveUploadPath(newPath);
 
         if (!fs.existsSync(oldFullPath)) {
-            return res.status(404).json({ error: '文件夹不存在' });
+            return res.status(404).json({ error: '文件或文件夹不存在' });
         }
-        
+
         if (fs.existsSync(newFullPath)) {
             return res.status(400).json({ error: '目标名称已存在' });
         }
-        
+
+        const isDirectory = fs.statSync(oldFullPath).isDirectory();
         fs.renameSync(oldFullPath, newFullPath);
-        
+
         const oldPathDisplay = getDisplayPath(oldRelativePath);
         const newPathDisplay = getDisplayPath(newRelativePath);
-        addLog(req, '重命名文件夹', `${oldPathDisplay} → ${newPathDisplay}`);
+        addLog(req, isDirectory ? '重命名文件夹' : '重命名文件', `${oldPathDisplay} → ${newPathDisplay}`);
         
         res.json({ message: '重命名成功', newPath: newRelativePath });
     } catch (error) {
